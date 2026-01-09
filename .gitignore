@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv311/
+env/
+ENV/
+
+# Logs
+logs/
+*.log
+
+# Models
+it-da-ai-server/models/
+
+# IDE
+.idea/
+*.iml
+.vscode/
