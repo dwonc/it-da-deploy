@@ -16,7 +16,7 @@ import java.util.List;
 
 @Slf4j
 @RestController
-@RequestMapping("/users")
+@RequestMapping("/api/users")  // ✅ /api 추가!
 @RequiredArgsConstructor
 public class UserController {
 
