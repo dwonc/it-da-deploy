@@ -34,18 +34,18 @@ export const router = createBrowserRouter(
       path: "/ai-matching",
       element: <AIMatchingPage />,
     },
-    {
-      path: "/auth/callback/:provider",
-      element: <OAuth2CallbackPage />,
-    },
-    {
-      path: "/chat/:roomId",
-      element: (
-        <ProtectedRoute>
-          <ChatRoomPage />
-        </ProtectedRoute>
-      ),
-    },
+    // {
+    //   path: "/auth/callback/:provider",
+    //   element: <OAuth2CallbackPage />,
+    // },
+    // {
+    //   path: "/chat/:roomId",
+    //   element: (
+    //     <ProtectedRoute>
+    //       <ChatRoomPage />
+    //     </ProtectedRoute>
+    //   ),
+    // },
   ],
 
   {
