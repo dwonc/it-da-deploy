@@ -196,6 +196,8 @@ public class MeetingSearchService {
                 .updatedAt(meeting.getUpdatedAt())
                 .isFull(meeting.isFull())
                 .dDay(dDay)
+                .avgRating(meeting.getAvgRating())
+                .ratingCount(meeting.getRatingCount())
                 .build();
     }
 }

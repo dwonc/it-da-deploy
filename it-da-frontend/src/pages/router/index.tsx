@@ -7,6 +7,10 @@ import ProtectedRoute from "./ProtectedRoute";
 import PublicRoute from "./PublicRoute";
 import OAuth2CallbackPage from "@/pages/auth/OAuth2CallbackPage";
 import ChatRoomPage from "@/pages/chat/ChatRoomPage";
+import CategoryListPage from "@/pages/category/CategoryListPage";
+import CategoryDetailPage from "@/pages/category/CategoryDetailPage";
+import MeetingListPage from "@/pages/meeting/MeetingListPage";
+import MeetingDetailPage from "@/pages/meeting/MeetingDetailPage";
 
 export const router = createBrowserRouter(
   [
@@ -34,6 +38,22 @@ export const router = createBrowserRouter(
       path: "/ai-matching",
       element: <AIMatchingPage />,
     },
+      {
+          path: "/category",
+          element: <CategoryListPage />,
+      },
+      {
+          path: "/category/:category",
+          element: <CategoryDetailPage />,
+      },
+      {
+          path: "/meetings",
+          element: <MeetingListPage />,
+      },
+      {
+          path: "/meeting/:id",
+          element: <MeetingDetailPage />,
+      },
     // {
     //   path: "/auth/callback/:provider",
     //   element: <OAuth2CallbackPage />,

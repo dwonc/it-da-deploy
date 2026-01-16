@@ -1,6 +1,7 @@
 import { Client, IMessage } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import axios from "axios";
+import { User } from "@/types/user.types";
 
 export interface ChatMessage {
   id?: number;
@@ -26,6 +27,24 @@ class ChatApi {
     const response = await axios.get(`/api/social/messages/${roomId}`);
     return response.data;
   }
+
+    //채팅방 멤버 조회
+    async getChatMembers(roomId: number): Promise<User[]> {
+        try {
+            const response = await axios.get(`/api/social/rooms/${roomId}/members`);
+
+            // ✅ 백엔드 응답을 User 타입에 맞게 변환
+            return response.data.map((member: any) => ({
+                ...member,                      // 기존 필드 유지
+                id: member.userId,              // userId → id
+                name: member.username,          // username → name
+                role: member.role || 'MEMBER',  // role 없으면 기본값
+            }));
+        } catch (error) {
+            console.error('❌ 멤버 조회 실패:', error);
+            return [];
+        }
+    }
 
 // chat.api.ts
 
