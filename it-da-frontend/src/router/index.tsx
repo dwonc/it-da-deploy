@@ -12,12 +12,26 @@ import ChatRoomPage from "@/pages/chat/ChatRoomPage";
 import TestChatPage from "@/pages/chat/TestChatPage.tsx";
 import MeetingCreatePage from "@/pages/meeting/MeetingCreatePage";
 import MeetingDetailPage from "@/pages/meeting/MeetingDetailPage";
+import { PreferenceGuard } from "@/components/auth/PreferenceGuard.tsx";
+import UserPreferenceSetupPage from "@/pages/auth/UserPreferenceSetupPage.tsx";
 
 export const router = createBrowserRouter(
   [
     {
       path: "/",
-      element: <HomePage />,
+      element: (
+        <PreferenceGuard>
+          <HomePage />
+        </PreferenceGuard>
+      ),
+    },
+    {
+      path: "/user-preference/setup",
+      element: (
+        <ProtectedRoute>
+          <UserPreferenceSetupPage />
+        </ProtectedRoute>
+      ),
     },
     {
       path: "/login",
@@ -37,7 +51,15 @@ export const router = createBrowserRouter(
     },
     {
       path: "/ai-matching",
-      element: <AIMatchingPage />,
+      element: (
+        <PreferenceGuard>
+          {" "}
+          {/* ✅ 매칭 서비스 이용 전 성향표 체크 */}
+          <ProtectedRoute>
+            <AIMatchingPage />
+          </ProtectedRoute>
+        </PreferenceGuard>
+      ),
     },
     {
       path: "/meetings",
@@ -79,7 +101,6 @@ export const router = createBrowserRouter(
       element: <ProfileEditPage />,
     },
     {
-      // 2. 백엔드에서 단순히 /auth/callback으로만 보낼 경우 (404 방지)
       path: "/auth/callback",
       element: <OAuth2CallbackPage />,
     },
