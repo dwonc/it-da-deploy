@@ -321,7 +321,7 @@ public class MeetingService {
         Meeting meeting = meetingRepository.findById(meetingId)
                 .orElseThrow(() -> new IllegalArgumentException("모임을 찾을 수 없습니다."));
 
-        // 2. 권한 확인 (주최자만 이미지 변경 가능)
+        // 2. 권한 확인
         if (!meeting.getOrganizer().getUserId().equals(user.getUserId())) {
             throw new IllegalArgumentException("모임 주최자만 이미지를 변경할 수 있습니다.");
         }
@@ -346,15 +346,16 @@ public class MeetingService {
 
             // 고유한 파일명 생성
             String originalFilename = image.getOriginalFilename();
-            String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+            String extension = originalFilename != null ?
+                    originalFilename.substring(originalFilename.lastIndexOf(".")) : ".jpg";
             String savedFilename = UUID.randomUUID().toString() + extension;
 
             // 파일 저장
             Path filePath = uploadPath.resolve(savedFilename);
             Files.copy(image.getInputStream(), filePath);
 
-            // ✅ 절대 URL로 반환 (프론트엔드에서 바로 사용 가능)
-            String imageUrl = "http://localhost:8080/uploads/meetings/" + savedFilename;
+            // ✅ 5. 상대 경로로 저장 (UserProfile처럼)
+            String imageUrl = "/uploads/meetings/" + savedFilename;
 
             // 6. Meeting 엔티티에 이미지 URL 저장
             meeting.updateImageUrl(imageUrl);
