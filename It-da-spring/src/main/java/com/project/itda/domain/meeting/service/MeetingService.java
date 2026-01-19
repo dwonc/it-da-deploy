@@ -8,15 +8,21 @@ import com.project.itda.domain.meeting.entity.Meeting;
 import com.project.itda.domain.meeting.enums.MeetingStatus;
 import com.project.itda.domain.meeting.enums.MeetingTimeSlot;
 import com.project.itda.domain.meeting.repository.MeetingRepository;
+import com.project.itda.domain.participation.dto.response.ParticipantDto;
+import com.project.itda.domain.participation.entity.Participation;
+import com.project.itda.domain.participation.enums.ParticipationStatus;
+import com.project.itda.domain.participation.repository.ParticipationRepository;
 import com.project.itda.domain.user.entity.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 모임 서비스 (CRUD)
@@ -27,6 +33,7 @@ import java.util.List;
 public class MeetingService {
 
     private final MeetingRepository meetingRepository;
+    private final ParticipationRepository participationRepository;
 
     /**
      * 모임 생성
@@ -230,4 +237,71 @@ public class MeetingService {
                 .dDay(dDay)
                 .build();
     }
+
+    @Transactional(readOnly = true)
+    public MeetingDetailResponse getMeetingById(Long meetingId) {
+        log.info("🔍 모임 상세 조회 - meetingId: {}", meetingId);
+
+        Meeting meeting = meetingRepository.findById(meetingId)
+                .orElseThrow(() -> new IllegalArgumentException("모임을 찾을 수 없습니다."));
+
+        // 참여자 목록 조회 (APPROVED 상태만)
+        List<Participation> participations = participationRepository
+                .findByMeetingAndStatus(meeting, ParticipationStatus.APPROVED);
+
+        log.info("👥 조회된 참여자 수: {}", participations.size());
+
+        // 참여자 DTO 변환
+        List<ParticipantDto> participants = participations.stream()
+                .map(p -> ParticipantDto.builder()
+                        .userId(p.getUser().getUserId())
+                        .username(p.getUser().getUsername())
+                        .profileImage(p.getUser().getProfileImageUrl())
+                        .status(p.getStatus().name())
+                        .joinedAt(p.getCreatedAt())
+                        .build())
+                .collect(Collectors.toList());
+
+        log.info("📦 변환된 참여자 DTO 수: {}", participants.size());
+
+        MeetingDetailResponse response = MeetingDetailResponse.builder()
+                .meetingId(meeting.getMeetingId())
+                .organizerId(meeting.getOrganizer().getUserId())
+                .organizerUsername(meeting.getOrganizer().getUsername())
+                .organizerProfileImage(meeting.getOrganizer().getProfileImageUrl())
+                .organizerEmail(meeting.getOrganizer().getEmail())
+                .title(meeting.getTitle())
+                .description(meeting.getDescription())
+                .category(meeting.getCategory())
+                .subcategory(meeting.getSubcategory())
+                .meetingTime(meeting.getMeetingTime())
+                .timeSlot(meeting.getTimeSlot().name())
+                .locationName(meeting.getLocationName())
+                .locationAddress(meeting.getLocationAddress())
+                .latitude(meeting.getLatitude())
+                .longitude(meeting.getLongitude())
+                .locationType(meeting.getLocationType().name())
+                .vibe(meeting.getVibe())
+                .currentParticipants(meeting.getCurrentParticipants())
+                .maxParticipants(meeting.getMaxParticipants())
+                .expectedCost(meeting.getExpectedCost())
+                .imageUrl(meeting.getImageUrl())
+                .status(meeting.getStatus().name())
+                .avgRating(meeting.getAvgRating() != null ? meeting.getAvgRating() : 0.0)
+                .reviewCount((long) (meeting.getReviewCount() != null ? meeting.getReviewCount() : 0))
+                .createdAt(meeting.getCreatedAt())
+                .isFull(meeting.getCurrentParticipants() >= meeting.getMaxParticipants())
+                .dDay((long) calculateDDay(meeting.getMeetingTime()))
+                .participants(participants)  // 이 부분이 중요!
+                .build();
+
+        log.info("✅ 응답 생성 완료 - participants 포함: {}", response.getParticipants() != null);
+
+        return response;
+    }
+
+    private int calculateDDay(LocalDateTime meetingTime) {
+        return (int) ChronoUnit.DAYS.between(LocalDate.now(), meetingTime.toLocalDate());
+    }
+
 }

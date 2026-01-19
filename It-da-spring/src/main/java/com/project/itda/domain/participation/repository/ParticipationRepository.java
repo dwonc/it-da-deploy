@@ -1,5 +1,6 @@
 package com.project.itda.domain.participation.repository;
 
+import com.project.itda.domain.meeting.entity.Meeting;
 import com.project.itda.domain.participation.entity.Participation;
 import com.project.itda.domain.participation.enums.ParticipationStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -136,4 +137,13 @@ public interface ParticipationRepository extends JpaRepository<Participation, Lo
             "AND p.status = 'COMPLETED' " +
             "ORDER BY p.appliedAt DESC")
     List<Participation> findCompletedParticipationsByUserId(@Param("userId") Long userId);
+
+    /**
+     * 모임과 상태로 참여 목록 조회
+     */
+    @Query("SELECT p FROM Participation p WHERE p.meeting = :meeting AND p.status = :status")
+    List<Participation> findByMeetingAndStatus(
+            @Param("meeting") Meeting meeting,
+            @Param("status") ParticipationStatus status
+    );
 }

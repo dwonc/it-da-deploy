@@ -175,11 +175,26 @@ public class Meeting {
     private Double avgRating;
 
     /**
+     * 리뷰 개수 (후기 개수)
+     */
+    @Column(name = "review_count")
+    @ColumnDefault("0")
+    private Integer reviewCount;
+
+    /**
      * 평균 평점 업데이트 (ReviewService에서 호출)
      */
     public void updateAvgRating(Double avgRating) {
         this.avgRating = avgRating;
     }
+
+    /**
+     * 리뷰 개수 업데이트
+     */
+    public void updateReviewCount(Integer reviewCount) {
+        this.reviewCount = reviewCount;
+    }
+
     /**
      * 수정일
      */
@@ -211,8 +226,8 @@ public class Meeting {
     private Integer matchScore;
 
     // ========================================
-// 필드 추가
-// ========================================
+    // 필드 추가
+    // ========================================
 
     @Column(name = "rating_count")
     private Integer ratingCount;  // 평점 개수
@@ -251,6 +266,12 @@ public class Meeting {
         }
         if (this.isPublic == null) {
             this.isPublic = true;
+        }
+        if (this.reviewCount == null) {
+            this.reviewCount = 0;
+        }
+        if (this.ratingCount == null) {
+            this.ratingCount = 0;
         }
     }
 
@@ -370,14 +391,14 @@ public class Meeting {
      * 위도 Double 변환 (AI용)
      */
     public Double getLatitudeAsDouble() {
-        return latitude != null ? latitude.doubleValue() : null;
+        return latitude != null ? latitude : null;
     }
 
     /**
      * 경도 Double 변환 (AI용)
      */
     public Double getLongitudeAsDouble() {
-        return longitude != null ? longitude.doubleValue() : null;
+        return longitude != null ? longitude : null;
     }
 
     // Getter에서 동적 계산
@@ -393,5 +414,4 @@ public class Meeting {
         if (meetingTime == null) return null;
         return meetingTime.toLocalDate().toString();
     }
-
 }

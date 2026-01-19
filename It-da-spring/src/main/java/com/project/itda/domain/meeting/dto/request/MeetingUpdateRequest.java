@@ -35,7 +35,7 @@ public class MeetingUpdateRequest {
      */
     @NotNull(message = "모임 일시는 필수입니다")
     @Future(message = "모임 일시는 현재 시간 이후여야 합니다")
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss[.SSS]")  // ✅ 이 줄 추가
     private LocalDateTime meetingTime;
 
     /**

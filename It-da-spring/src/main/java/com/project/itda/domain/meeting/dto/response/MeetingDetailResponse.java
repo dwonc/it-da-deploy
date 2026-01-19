@@ -1,6 +1,7 @@
 package com.project.itda.domain.meeting.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.project.itda.domain.participation.dto.response.ParticipantDto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -171,7 +172,7 @@ public class MeetingDetailResponse {
     /**
      * 참여자 목록 (선택적)
      */
-    private List<ParticipantInfo> participants;
+    private List<ParticipantDto> participants; // 추가
 
     /**
      * 추천 장소 (선택적)

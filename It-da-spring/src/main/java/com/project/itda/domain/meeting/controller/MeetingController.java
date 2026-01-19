@@ -90,18 +90,37 @@ public class MeetingController {
     /**
      * 모임 상세 조회
      */
+//    @Operation(
+//            summary = "모임 상세 조회",
+//            description = "모임의 상세 정보를 조회합니다"
+//    )
+//    @GetMapping("/{meetingId}")
+//    public ResponseEntity<MeetingDetailResponse> getMeeting(
+//            @Parameter(description = "모임 ID", required = true)
+//            @PathVariable Long meetingId
+//    ) {
+//        log.info("📍 GET /api/meetings/{}", meetingId);
+//
+//        MeetingDetailResponse response = meetingService.getMeetingDetail(meetingId);
+//
+//        return ResponseEntity.ok(response);
+//    }
+
+    /**
+     * 모임 상세 조회 (참여자 포함)
+     */
     @Operation(
             summary = "모임 상세 조회",
-            description = "모임의 상세 정보를 조회합니다"
+            description = "모임 ID로 상세 정보를 조회합니다 (참여자 정보 포함)"
     )
     @GetMapping("/{meetingId}")
-    public ResponseEntity<MeetingDetailResponse> getMeeting(
+    public ResponseEntity<MeetingDetailResponse> getMeetingById(
             @Parameter(description = "모임 ID", required = true)
             @PathVariable Long meetingId
     ) {
         log.info("📍 GET /api/meetings/{}", meetingId);
 
-        MeetingDetailResponse response = meetingService.getMeetingDetail(meetingId);
+        MeetingDetailResponse response = meetingService.getMeetingById(meetingId);
 
         return ResponseEntity.ok(response);
     }

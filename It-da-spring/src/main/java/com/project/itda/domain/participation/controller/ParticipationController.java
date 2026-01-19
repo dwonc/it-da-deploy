@@ -1,5 +1,7 @@
 package com.project.itda.domain.participation.controller;
 
+import com.project.itda.domain.meeting.dto.response.MeetingDetailResponse;
+import com.project.itda.domain.meeting.service.MeetingService;
 import com.project.itda.domain.participation.dto.request.ParticipationRequest;
 import com.project.itda.domain.participation.dto.request.ParticipationStatusRequest;
 import com.project.itda.domain.participation.dto.response.ParticipantListResponse;

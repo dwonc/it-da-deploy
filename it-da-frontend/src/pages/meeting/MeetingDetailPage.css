@@ -260,7 +260,8 @@
 
 .participant-avatars {
   display: flex;
-  gap: -8px;
+  gap: 0.5rem; /* -8px 대신 양수 값으로 */
+  flex-wrap: wrap;
 }
 
 .participant-avatar {
@@ -305,6 +306,13 @@
   padding: 1.5rem;
   background: #f8f9fa;
   border-radius: 12px;
+  transition: all 0.2s;
+}
+
+.organizer-card:hover {
+  background: #f0f0f5;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 .organizer-avatar {
@@ -320,6 +328,7 @@
   font-size: 1.5rem;
   box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .organizer-avatar img {
@@ -330,15 +339,31 @@
 
 .organizer-info {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
 }
 
-.organizer-name {
+.organizer-name-row {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.organizer-username {
   font-size: 1.1rem;
   font-weight: 700;
-  margin-bottom: 0.25rem;
+  color: #333;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: color 0.2s;
+  text-align: left;
+}
+
+.organizer-username:hover {
+  color: #667eea;
 }
 
 .organizer-badge {
@@ -347,11 +372,19 @@
   color: white;
   border-radius: 12px;
   font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.organizer-id {
+  font-size: 0.9rem;
+  color: #888;
+  font-family: "Courier New", monospace;
 }
 
 .organizer-stats {
   font-size: 0.9rem;
   color: #666;
+  margin-top: 0.2rem;
 }
 
 /* ==================== 위치 ==================== */

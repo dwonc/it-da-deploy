@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/useAuthStore";
+import MeetingManageModal from "@/pages/meeting/MeetingManageModal";
 import axios from "axios";
 import "./MeetingDetailPage.css";
+import ChatPreviewModal from "./ChatPreviewModal";
 
 interface MeetingDetail {
   meetingId: number;
@@ -71,12 +73,19 @@ const MeetingDetailPage = () => {
   const [userDistance, setUserDistance] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [isParticipating, setIsParticipating] = useState(false); // 참여 상태 추가
+  const [participationStatus, setParticipationStatus] = useState<string | null>(
+    null
+  ); // 참여 상태 추가
+  const [isManageModalOpen, setIsManageModalOpen] = useState(false);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
   useEffect(() => {
     fetchMeetingDetail();
     if (user) {
       fetchSatisfactionPrediction();
       checkSvdRecommendation();
+      checkParticipationStatus(); // 참여 상태 확인
     }
   }, [meetingId, user]);
 
@@ -93,12 +102,77 @@ const MeetingDetailPage = () => {
         { withCredentials: true }
       );
       console.log("✅ 모임 정보:", response.data);
-      setMeeting(response.data);
+
+      let meetingData = response.data;
+
+      // participants가 없으면 별도로 불러오기
+      if (!meetingData.participants || meetingData.participants.length === 0) {
+        try {
+          const participantsRes = await axios.get(
+            `http://localhost:8080/api/participations/meeting/${meetingId}`,
+            { withCredentials: true }
+          );
+
+          console.log("✅ 참여자 API 응답:", participantsRes.data);
+
+          // 응답 구조에 따라 처리
+          let participantsList = [];
+          if (Array.isArray(participantsRes.data)) {
+            participantsList = participantsRes.data;
+          } else if (participantsRes.data.participants) {
+            participantsList = participantsRes.data.participants;
+          }
+
+          // APPROVED 상태만 필터링하여 추가
+          meetingData.participants = participantsList
+            .filter((p: any) => p.status === "APPROVED")
+            .map((p: any) => ({
+              userId: p.userId,
+              username: p.username,
+              profileImage: p.profileImage,
+              status: p.status,
+              joinedAt: p.createdAt || p.joinedAt,
+            }));
+
+          console.log("✅ 변환된 참여자:", meetingData.participants);
+        } catch (participantsErr) {
+          console.error("❌ 참여자 조회 실패:", participantsErr);
+          // 참여자 조회 실패해도 모임 정보는 표시
+          meetingData.participants = [];
+        }
+      }
+
+      setMeeting(meetingData);
     } catch (err) {
       console.error("❌ 모임 조회 실패:", err);
       setError("모임을 불러올 수 없습니다.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkParticipationStatus = async () => {
+    if (!user || !meetingId) return;
+
+    try {
+      // 내 참여 목록 조회
+      const response = await axios.get(
+        `http://localhost:8080/api/participations/my`,
+        { withCredentials: true }
+      );
+
+      // 현재 모임에 참여했는지 확인
+      const participation = response.data.find(
+        (p: any) => p.meetingId === parseInt(meetingId)
+      );
+
+      if (participation) {
+        setIsParticipating(true);
+        setParticipationStatus(participation.status);
+        console.log("✅ 참여 상태:", participation.status);
+      }
+    } catch (err) {
+      console.error("❌ 참여 상태 확인 실패:", err);
     }
   };
 
@@ -127,7 +201,6 @@ const MeetingDetailPage = () => {
 
       console.log("✅ 만족도 예측 응답:", response.data);
 
-      // 응답 데이터 유효성 검사
       if (
         response.data &&
         response.data.predictedRating &&
@@ -136,7 +209,6 @@ const MeetingDetailPage = () => {
       ) {
         setSatisfaction(response.data);
 
-        // 거리 정보 추출
         const distanceReason = response.data.reasons.find((r: ReasonItem) =>
           r.text.includes("km")
         );
@@ -148,7 +220,6 @@ const MeetingDetailPage = () => {
         }
       } else {
         console.warn("⚠️ 응답 데이터 불완전 - Mock 데이터 사용");
-        // Mock 데이터 설정
         const mockData: SatisfactionPrediction = {
           userId: user.userId,
           meetingId: parseInt(meetingId),
@@ -169,10 +240,6 @@ const MeetingDetailPage = () => {
       }
     } catch (err: any) {
       console.error("❌ 만족도 예측 실패:", err);
-      console.error("에러 상세:", err.response?.data);
-
-      // 에러 발생 시에도 Mock 데이터 표시
-      console.log("🔄 에러 발생 - Mock 데이터로 대체");
       const mockData: SatisfactionPrediction = {
         userId: user.userId,
         meetingId: parseInt(meetingId),
@@ -200,11 +267,6 @@ const MeetingDetailPage = () => {
     }
 
     try {
-      console.log("🔍 SVD 추천 확인 요청:", {
-        user_id: user.userId,
-        top_n: 20,
-      });
-
       const response = await axios.get(
         `http://localhost:8080/api/ai/recommendations/meetings`,
         {
@@ -216,21 +278,14 @@ const MeetingDetailPage = () => {
         }
       );
 
-      console.log("✅ SVD 추천 응답:", response.data);
-
       const recommendations = response.data.recommendations || [];
       const isRecommended = recommendations.some(
         (rec: any) => rec.meeting_id === parseInt(meetingId)
       );
 
-      console.log("🎯 SVD 추천 여부:", isRecommended);
       setIsSvdRecommended(isRecommended);
     } catch (err: any) {
       console.error("❌ SVD 추천 확인 실패:", err);
-      console.error("에러 상세:", err.response?.data);
-
-      // 에러 발생 시 임시로 true 설정 (테스트용)
-      console.log("🔄 Mock: SVD 추천 true로 설정");
       setIsSvdRecommended(true);
     }
   };
@@ -241,28 +296,40 @@ const MeetingDetailPage = () => {
     const container = document.getElementById("detailMap");
     if (!container) return;
 
-    const options = {
-      center: new window.kakao.maps.LatLng(meeting.latitude, meeting.longitude),
-      level: 3,
-    };
+    if (window.kakao && window.kakao.maps) {
+      window.kakao.maps.load(() => {
+        const options = {
+          center: new window.kakao.maps.LatLng(
+            meeting.latitude,
+            meeting.longitude
+          ),
+          level: 3,
+        };
 
-    mapRef.current = new window.kakao.maps.Map(container, options);
+        mapRef.current = new window.kakao.maps.Map(container, options);
 
-    const markerPosition = new window.kakao.maps.LatLng(
-      meeting.latitude,
-      meeting.longitude
-    );
+        const markerPosition = new window.kakao.maps.LatLng(
+          meeting.latitude,
+          meeting.longitude
+        );
 
-    new window.kakao.maps.Marker({
-      position: markerPosition,
-      map: mapRef.current,
-    });
+        new window.kakao.maps.Marker({
+          position: markerPosition,
+          map: mapRef.current,
+        });
+      });
+    }
   };
-
   const handleParticipate = async () => {
     if (!user) {
       alert("로그인이 필요합니다.");
       navigate("/login");
+      return;
+    }
+
+    // 주최자 체크
+    if (user.userId === meeting?.organizerId) {
+      alert("모임 주최자는 참여 신청을 할 수 없습니다.");
       return;
     }
 
@@ -272,11 +339,78 @@ const MeetingDetailPage = () => {
         { meetingId: meeting?.meetingId },
         { withCredentials: true }
       );
-      alert("🎉 참여 신청이 완료되었습니다!");
-      fetchMeetingDetail();
-    } catch (err) {
+
+      setIsParticipating(true);
+      setParticipationStatus("PENDING");
+      await fetchMeetingDetail();
+      // ✅ 모달 열기 (페이지 이동 대신)
+      setIsPreviewModalOpen(true);
+    } catch (err: any) {
       console.error("참여 신청 실패:", err);
+
+      // 주최자 에러
+      if (
+        err.response?.status === 500 &&
+        err.response?.data?.includes("주최자는 참여 신청을 할 수 없습니다")
+      ) {
+        alert("모임 주최자는 참여 신청을 할 수 없습니다.");
+        return;
+      }
+
+      // 중복 신청 에러
+      if (
+        err.response?.status === 500 &&
+        err.response?.data?.includes("이미 신청한 모임")
+      ) {
+        alert("이미 참여 신청한 모임입니다.");
+        checkParticipationStatus();
+        return;
+      }
+
+      if (err.response?.status === 409) {
+        alert("이미 참여 신청한 모임입니다.");
+        checkParticipationStatus();
+        return;
+      }
+
       alert("참여 신청에 실패했습니다.");
+    }
+  };
+
+  const getParticipationButtonText = () => {
+    if (meeting?.isFull) return "모집 마감";
+    if (!isParticipating) return "✨ 참여 신청하기";
+
+    switch (participationStatus) {
+      case "PENDING":
+        return "⏳ 승인 대기 중";
+      case "APPROVED":
+        return "✅ 참여 중";
+      case "REJECTED":
+        return "❌ 참여 거절됨";
+      default:
+        return "✨ 참여 신청하기";
+    }
+  };
+
+  // 주최자 여부 확인
+  const isOrganizer = user?.userId === meeting?.organizerId;
+
+  // 버튼 비활성화 조건
+  const isButtonDisabled = () => {
+    return isOrganizer || meeting?.isFull || isParticipating;
+  };
+
+  // 주최자용 버튼 클릭 핸들러 수정
+  const handleOrganizerAction = () => {
+    setIsManageModalOpen(true);
+  };
+
+  const handleChatPreview = () => {
+    if (isParticipating && participationStatus === "APPROVED") {
+      navigate(`/chat/${meetingId}`);
+    } else {
+      alert("참여 승인 후 톡방에 입장할 수 있습니다.");
     }
   };
 
@@ -329,11 +463,11 @@ const MeetingDetailPage = () => {
           />
         )}
         <div className="hero-content">
-          <button className="back-btn" onClick={() => navigate(-1)}>
+          <button className="back-btn" onClick={() => navigate("/")}>
             ←
           </button>
 
-          {/* AI 배지들 - 왼쪽 상단 */}
+          {/* AI 배지들 */}
           <div className="ai-badges">
             {isSvdRecommended && (
               <div className="ai-badge svd-badge">
@@ -373,7 +507,7 @@ const MeetingDetailPage = () => {
 
       {/* 컨테이너 */}
       <div className="container">
-        {/* AI 추천 이유 카드 - 큰 카드 */}
+        {/* AI 추천 이유 카드 */}
         {satisfaction &&
           satisfaction.reasons &&
           satisfaction.reasons.length > 0 && (
@@ -430,7 +564,6 @@ const MeetingDetailPage = () => {
           <h2 className="section-title">📝 모임 소개</h2>
           <p className="description">{meeting.description}</p>
 
-          {/* 태그 */}
           <div className="tags">
             <span className="tag">#{meeting.category}</span>
             <span className="tag">#{meeting.subcategory}</span>
@@ -444,24 +577,82 @@ const MeetingDetailPage = () => {
           <h2 className="section-title">
             👥 참여자 ({meeting.currentParticipants}명)
           </h2>
+
           <div className="participants">
             <div className="participant-avatars">
-              {meeting.participants
-                ?.filter((p) => p.status === "APPROVED")
-                .slice(0, 6)
-                .map((participant) => (
-                  <div key={participant.userId} className="participant-avatar">
-                    {participant.profileImage ? (
-                      <img
-                        src={participant.profileImage}
-                        alt={participant.username}
-                      />
-                    ) : (
-                      participant.username.charAt(0)
-                    )}
-                  </div>
-                ))}
+              {(() => {
+                console.log("=== 참여자 렌더링 디버깅 ===");
+                console.log("meeting.participants:", meeting.participants);
+
+                if (!meeting.participants) {
+                  console.log("participants가 undefined/null");
+                  return (
+                    <div style={{ padding: "1rem", color: "#999" }}>
+                      참여자 정보 없음
+                    </div>
+                  );
+                }
+
+                if (!Array.isArray(meeting.participants)) {
+                  console.log("participants가 배열이 아님");
+                  return (
+                    <div style={{ padding: "1rem", color: "#999" }}>
+                      참여자 데이터 형식 오류
+                    </div>
+                  );
+                }
+
+                console.log(
+                  "전체 participants 수:",
+                  meeting.participants.length
+                );
+
+                const approvedParticipants = meeting.participants.filter(
+                  (p) => {
+                    console.log("필터링 중:", p, "status:", p.status);
+                    return p.status === "APPROVED";
+                  }
+                );
+
+                console.log(
+                  "APPROVED participants 수:",
+                  approvedParticipants.length
+                );
+
+                if (approvedParticipants.length === 0) {
+                  return (
+                    <div style={{ padding: "1rem", color: "#999" }}>
+                      승인된 참여자가 없습니다.
+                    </div>
+                  );
+                }
+
+                return approvedParticipants.slice(0, 6).map((participant) => {
+                  console.log("렌더링:", participant.username);
+                  return (
+                    <div
+                      key={participant.userId}
+                      className="participant-avatar"
+                      style={{ marginRight: "0.5rem" }} // 임시 스타일 추가
+                    >
+                      {participant.profileImage ? (
+                        <img
+                          src={participant.profileImage}
+                          alt={participant.username}
+                        />
+                      ) : (
+                        <span
+                          style={{ fontSize: "1.2rem", fontWeight: "bold" }}
+                        >
+                          {participant.username.charAt(0)}
+                        </span>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
             </div>
+
             {meeting.maxParticipants - meeting.currentParticipants > 0 && (
               <span className="participant-count">
                 + {meeting.maxParticipants - meeting.currentParticipants}자리
@@ -483,8 +674,9 @@ const MeetingDetailPage = () => {
               )}
             </div>
             <div className="organizer-info">
-              <div className="organizer-name">
+              <div className="organizer-name-row">
                 <button
+                  className="organizer-username"
                   onClick={() =>
                     navigate(`/${meeting.organizerEmail.split("@")[0]}`)
                   }
@@ -492,6 +684,9 @@ const MeetingDetailPage = () => {
                   {meeting.organizerUsername}
                 </button>
                 <span className="organizer-badge">모임장</span>
+              </div>
+              <div className="organizer-id">
+                @{meeting.organizerEmail.split("@")[0]}
               </div>
               {meeting.avgRating > 0 && (
                 <div className="organizer-stats">
@@ -516,17 +711,54 @@ const MeetingDetailPage = () => {
 
       {/* 하단 액션 버튼 */}
       <div className="action-buttons">
-        <button className="btn btn-secondary" onClick={() => navigate("/chat")}>
-          💬 톡방 미리보기
-        </button>
-        <button
-          className="btn btn-primary"
-          onClick={handleParticipate}
-          disabled={meeting.isFull}
-        >
-          {meeting.isFull ? "모집 마감" : "✨ 참여 신청하기"}
-        </button>
+        {isOrganizer ? (
+          <>
+            <button
+              className="btn btn-secondary"
+              onClick={() => navigate(`/chat/${meetingId}`)}
+            >
+              💬 톡방 입장
+            </button>
+            <button className="btn btn-primary" onClick={handleOrganizerAction}>
+              ⚙️ 모임 관리
+            </button>
+          </>
+        ) : (
+          <>
+            <button className="btn btn-secondary" onClick={handleChatPreview}>
+              💬 톡방 {participationStatus === "APPROVED" ? "입장" : "미리보기"}
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={handleParticipate}
+              disabled={isButtonDisabled()}
+            >
+              {getParticipationButtonText()}
+            </button>
+          </>
+        )}
       </div>
+
+      {/* 모임 관리 모달 */}
+      <MeetingManageModal
+        isOpen={isManageModalOpen}
+        onClose={() => setIsManageModalOpen(false)}
+        meetingId={meetingId!}
+        meetingTitle={meeting?.title || ""}
+        onUpdate={fetchMeetingDetail}
+      />
+
+      {/* ChatPreview 모달 */}
+      <ChatPreviewModal
+        isOpen={isPreviewModalOpen}
+        onClose={() => setIsPreviewModalOpen(false)}
+        meetingId={meetingId!}
+        participationStatus={participationStatus}
+        onEnterChat={() => {
+          setIsPreviewModalOpen(false);
+          navigate(`/chat/${meetingId}`);
+        }}
+      />
     </div>
   );
 };

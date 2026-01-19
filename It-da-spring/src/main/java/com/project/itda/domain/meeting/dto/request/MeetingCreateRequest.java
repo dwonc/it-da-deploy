@@ -48,8 +48,8 @@ public class MeetingCreateRequest {
     /**
      * 모임 일시
      */
-    @NotNull(message = "모임 일시는 필수입니다")
-    @Future(message = "모임 일시는 현재 시간 이후여야 합니다")
+    @NotNull(message = "모임 시간은 필수입니다")
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss[.SSS]")
     private LocalDateTime meetingTime;
 
     /**

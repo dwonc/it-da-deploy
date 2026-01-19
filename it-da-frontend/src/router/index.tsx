@@ -19,6 +19,9 @@ import CategoryDetailPage from "@/pages/category/CategoryDetailPage";
 import MeetingListPage from "@/pages/meeting/MeetingListPage";
 import UserProfile from "@/pages/mypage/UserProfile";
 import UserProfileById from "@/pages/mypage/UserProfileById";
+import ChatPreviewPage from "@/pages/meeting/ChatPreviewPage";
+import MeetingManagePage from "@/pages/meeting/MeetingManagePage";
+import MeetingEditPage from "@/pages/meeting/MeetingEditPage";
 
 console.log("ROUTER LOADED ✅");
 console.log("ROUTER VERSION ✅", "2026-01-16 15:30 profile routes fixed");
@@ -144,6 +147,18 @@ export const router = createBrowserRouter(
     {
       path: "/meetings/:meetingId",
       element: <MeetingDetailPage />,
+    },
+    {
+      path: "/meetings/:meetingId/chat-preview",
+      element: <ChatPreviewPage />,
+    },
+    {
+      path: "/meetings/:meetingId/manage",
+      element: <MeetingManagePage />,
+    },
+    {
+      path: "/meetings/:meetingId/edit",
+      element: <MeetingEditPage />,
     },
   ],
   {
