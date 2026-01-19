@@ -35,6 +35,7 @@ interface MeetingDetail {
   isFull: boolean;
   dDay: number;
   participants?: Participant[];
+  tags: string;
 }
 
 interface Participant {
@@ -481,7 +482,11 @@ const MeetingDetailPage = () => {
             ←
           </button>
 
-          {/* AI 배지들 */}
+          <button className="logo-home-btn" onClick={() => navigate("/")}>
+            <span className="logo-text">IT-DA</span>
+          </button>
+
+          {/* AI 배지들 - 왼쪽 상단 */}
           <div className="ai-badges">
             {isSvdRecommended && (
               <div className="ai-badge svd-badge">
@@ -579,10 +584,24 @@ const MeetingDetailPage = () => {
           <p className="description">{meeting.description}</p>
 
           <div className="tags">
-            <span className="tag">#{meeting.category}</span>
-            <span className="tag">#{meeting.subcategory}</span>
-            <span className="tag">#{meeting.vibe}</span>
-            <span className="tag">#{meeting.locationType}</span>
+            {/* ✅ 사용자가 입력한 커스텀 태그들 */}
+            {meeting.tags &&
+              (() => {
+                try {
+                  const customTags = JSON.parse(meeting.tags);
+                  return (
+                    Array.isArray(customTags) &&
+                    customTags.map((tag: string, index: number) => (
+                      <span key={`custom-${index}`} className="tag">
+                        #{tag}
+                      </span>
+                    ))
+                  );
+                } catch (e) {
+                  console.error("태그 파싱 실패:", e);
+                  return null;
+                }
+              })()}
           </div>
         </div>
 

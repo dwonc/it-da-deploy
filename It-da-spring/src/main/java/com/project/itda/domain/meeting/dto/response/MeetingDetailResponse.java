@@ -179,6 +179,11 @@ public class MeetingDetailResponse {
      */
     private RecommendedPlace recommendedPlace;
 
+    /**
+     * 태그 (JSON 배열)
+     */
+    private String tags;
+
     // ========================================
     // 내부 클래스
     // ========================================
