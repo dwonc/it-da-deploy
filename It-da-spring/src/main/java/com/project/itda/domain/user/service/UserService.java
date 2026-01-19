@@ -116,6 +116,8 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다"));
 
+        String oldAddress = user.getAddress();
+
         user.updateInfo(
                 request.getUsername(),
                 request.getPhone(),
@@ -130,12 +132,32 @@ public class UserService {
                 request.getIsPublic()
         );
 
-        // ✅ 프로필 변경 후 웹소켓 알림!
+        String newAddress = request.getAddress();
+        log.info("🔍 주소 → {}", newAddress);
+
+        // ✅ address가 "실제로 변경"된 경우만 위경도 갱신
+        if (newAddress != null && !newAddress.trim().isEmpty()
+                && (oldAddress == null || !oldAddress.equals(newAddress))) {
+
+            log.info("🔍 주소 변경 감지 → 위경도 재계산: {}", newAddress);
+            GeocodingService.Coordinates coords = geocodingService.getCoordinates(newAddress);
+
+            if (coords != null) {
+                user.setLatitude(coords.getLatitude());
+                user.setLongitude(coords.getLongitude());
+                log.info("✅ 위경도 업데이트 성공: ({}, {})", user.getLatitude(), user.getLongitude());
+            } else {
+                // ✅ 실패 시 기존 좌표 유지 (null로 덮지 말기)
+                log.warn("⚠️ 위경도 조회 실패 → 기존 좌표 유지. userId={}", userId);
+            }
+        }
+
         userFollowService.notifyProfileUpdate(userId);
         log.info("✅ 프로필 업데이트 및 알림 전송: userId={}", userId);
 
         return UserResponse.from(user);
     }
+
 
     @Transactional
     public void deleteUser(Long userId) {

@@ -445,9 +445,13 @@ def calculate_personality_bonus(user: dict, meeting: dict) -> float:
         bonus += 0.1
 
     # 5. 관심사 매칭
-    interests = user.get("interests", "[]")
-    category = meeting.get("category", "")
-    if category in interests:
+    raw = user.get("interests", "") or ""
+    interest_set = {x.strip().lower() for x in str(raw).replace("[", "").replace("]", "").replace('"', '').split(",") if
+                    x.strip()}
+    cat = (meeting.get("category", "") or "").strip().lower()
+    sub = (meeting.get("subcategory", "") or "").strip().lower()
+
+    if cat in interest_set or sub in interest_set:
         bonus += 0.25
 
     return min(bonus, 1.2)
@@ -788,89 +792,104 @@ async def parse_prompt(
 # ========================================
 # AI 매칭률 계산 (SVD 기반)
 # ========================================
-@router.get("/match-score")
-async def get_match_score(user_id: int, meeting_id: int):
-    try:
-        logger.info(f"🎯 매칭률 계산(Percentile): user_id={user_id}, meeting_id={meeting_id}")
+@router.post("/match-scores")
+async def get_match_scores(req: MatchScoresRequest):
+    user_id = req.user_id
+    meeting_ids = [int(x) for x in req.meeting_ids if x is not None]
 
-        # SVD 없으면 기본
-        if not model_loader.svd or not model_loader.svd.is_loaded():
-            return {
-                "success": True,
-                "userId": user_id,
-                "meetingId": meeting_id,
-                "matchPercentage": 75,
-                "matchLevel": "MEDIUM",
-                "predictedRating": 3.8,
-                "percentile": None
-            }
+    if not meeting_ids:
+        return {"success": True, "userId": user_id, "items": []}
 
-        # 1) 타겟 예측
-        target_rating = await model_loader.svd.predict_for_user_meeting(user_id, meeting_id)
-
-        # 2) 비교 분포(캐시 활용)
-        dist = get_cached_dist(user_id)
-        if dist is None:
-            # 추천 top50 (추천이 인기 fallback이면 그래도 분포가 생김)
-            recs = await model_loader.svd.recommend(user_id=user_id, top_n=50)
-            rec_ids = [int(mid) for (mid, _) in recs]
-
-            # rec_ids가 너무 적으면 popular로 보강 (optional)
-            if len(rec_ids) < 30:
-                popular = model_loader.svd._recommend_popular(50)
-                rec_ids = list(dict.fromkeys(rec_ids + [int(mid) for (mid, _) in popular]))[:50]
-
-            # 비교군 rating 계산
-            dist = []
-            for mid in rec_ids:
-                try:
-                    r = await model_loader.svd.predict_for_user_meeting(user_id, mid)
-                    dist.append(float(r))
-                except Exception:
-                    continue
-
-            # dist가 너무 빈약하면 안전장치
-            if len(dist) < 10:
-                dist = [target_rating] * 10
-
-            set_cached_dist(user_id, dist)
-
-        # 3) 퍼센타일 -> 매칭률
-        p = percentile_rank(target_rating, dist)  # 0~1
-        match_percentage = match_from_percentile(p, floor=25, ceil=99, gamma=1.45)
-
-        # 4) 레벨
-        if match_percentage >= 90:
-            match_level = "VERY_HIGH"
-        elif match_percentage >= 80:
-            match_level = "HIGH"
-        elif match_percentage >= 65:
-            match_level = "MEDIUM"
-        else:
-            match_level = "LOW"
-
-        logger.info(f"✅ match={match_percentage}% (rating={target_rating:.3f}, percentile={p:.3f}, dist_n={len(dist)})")
-
+    # SVD 없으면 대충 반환
+    if not model_loader.svd or not model_loader.svd.is_loaded():
         return {
             "success": True,
             "userId": user_id,
-            "meetingId": meeting_id,
-            "matchPercentage": match_percentage,
-            "matchLevel": match_level,
-            "predictedRating": round(float(target_rating), 2),
-            "percentile": round(float(p), 3),
-            "distCount": len(dist)
+            "items": [{"meetingId": mid, "predictedRating": 3.7, "matchPercentage": 75, "matchLevel": "MEDIUM"} for mid in meeting_ids]
         }
 
-    except Exception as e:
-        logger.error(f"❌ 매칭률 계산 실패: {e}", exc_info=True)
-        return {
-            "success": False,
-            "userId": user_id,
-            "meetingId": meeting_id,
-            "matchPercentage": 70,
-            "matchLevel": "MEDIUM"
-        }
+    preds = await model_loader.svd.predict_for_user_meetings(user_id, meeting_ids)
+    values = [float(v) for v in preds.values()]
+    n = len(values)
+
+    # 후보 적을 때는 100% 방지용 "동적 상한"
+    def dynamic_ceil(n: int) -> int:
+        if n <= 2:
+            return 82
+        if n <= 3:
+            return 85
+        if n <= 5:
+            return 88
+        if n <= 10:
+            return 90
+        return 92
+
+    ceil = dynamic_ceil(n)
+    floor = 40 if n <= 5 else 35  # 적을수록 바닥을 조금 올려서 보기 좋게
+
+    # 카드가 1개면 rating 기반으로만
+    if n < 2:
+        items = []
+        for mid, r in preds.items():
+            r = float(r)
+            mp = rating_to_match_score_sigmoid(r, mid=3.55, temp=0.45)  # 완만하게
+            mp = int(max(floor, min(ceil, mp)))
+            items.append({
+                "meetingId": mid,
+                "predictedRating": round(r, 3),
+                "matchPercentage": mp,
+                "matchLevel": "MEDIUM"
+            })
+        return {"success": True, "userId": user_id, "items": items}
+
+    sorted_vals = sorted(values)
+
+    def percentile_midrank(x: float) -> float:
+        lt = 0
+        eq = 0
+        for v in sorted_vals:
+            if v < x:
+                lt += 1
+            elif v == x:
+                eq += 1
+        p = (lt + 0.5 * eq) / n
+        eps = 0.5 / n
+        if p < eps: p = eps
+        if p > 1 - eps: p = 1 - eps
+        return p
+
+    items = []
+    for mid, r in preds.items():
+        r = float(r)
+        p = percentile_midrank(r)
+
+        # stretch 약하게 (2.2 -> 1.5 정도)
+        p = max(0.0, min(1.0, 0.5 + (p - 0.5) * 1.5))
+
+        # gamma도 완만하게 (3.0 -> 1.4)
+        match_pct = match_from_percentile(p, floor=floor, ceil=ceil, gamma=1.4)
+
+        if match_pct >= 88:
+            lvl = "VERY_HIGH"
+        elif match_pct >= 80:
+            lvl = "HIGH"
+        elif match_pct >= 65:
+            lvl = "MEDIUM"
+        else:
+            lvl = "LOW"
+
+        items.append({
+            "meetingId": mid,
+            "predictedRating": round(r, 3),
+            "percentile": round(p, 3),
+            "matchPercentage": int(match_pct),
+            "matchLevel": lvl,
+        })
+
+    # 높은 순으로 정렬(프론트에서 그대로 쓰기 좋게)
+    items.sort(key=lambda x: x["matchPercentage"], reverse=True)
+    return {"success": True, "userId": user_id, "items": items}
+
 
 @router.post("/match-scores")
 async def get_match_scores(req: MatchScoresRequest):

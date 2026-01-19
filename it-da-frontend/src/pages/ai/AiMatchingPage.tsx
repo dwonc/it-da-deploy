@@ -3,10 +3,6 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/useAuthStore";
 import "./AIMatchingPage.css";
 
-interface KeyPoint {
-  text: string;
-}
-
 interface SearchTraceStep {
   level: number;
   label: string;
@@ -21,32 +17,34 @@ interface SearchTrace {
   fallback: boolean;
 }
 
-interface AISearchResult {
-  user_prompt: string;
-  parsed_query: any;
-  total_candidates: number;
-  recommendations: Recommendation[];
-  fallback?: boolean;
-  search_trace?: SearchTrace; // ✅ 추가
-}
-
 interface Recommendation {
   meeting_id: number;
   title: string;
   category: string;
   subcategory: string;
-  location_name: string;
-  location_address: string;
-  distance_km: number;
-  meeting_time: string;
-  expected_cost: number;
-  current_participants: number;
-  max_participants: number;
-  match_score: number;
-  predicted_rating: number;
-  key_points: string[];
-  reasoning: string;
+
+  location_name?: string;
+  location_address?: string;
+  distance_km?: number;
+
+  meeting_time?: string;
+  expected_cost?: number;
+
+  current_participants?: number;
+  max_participants?: number;
+
+  match_score?: number;
+  predicted_rating?: number;
+
+  key_points?: string[];
+  reasoning?: string;
+
   image_url?: string;
+
+  // ✅ Clarification 카드용
+  is_clarification?: boolean;
+  match_level?: string;
+
   organizer?: {
     name: string;
     rating: number;
@@ -60,6 +58,7 @@ interface AISearchResult {
   total_candidates: number;
   recommendations: Recommendation[];
   fallback?: boolean;
+  search_trace?: SearchTrace;
 }
 
 const AIMatchingPage = () => {
@@ -92,7 +91,8 @@ const AIMatchingPage = () => {
     const controller = new AbortController();
     fetchAIRecommendations(q, controller.signal);
 
-    return () => controller.abort(); // ✅ 화면 이동/리렌더 시 이전 요청 끊기
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
   const fetchAIRecommendations = async (
@@ -116,7 +116,10 @@ const AIMatchingPage = () => {
       );
       if (!response.ok) throw new Error("AI 검색 실패");
       const data = await response.json();
+
       setSearchResult(data);
+      setCurrentIndex(0); // ✅ 새 검색이면 첫 카드로
+      setShowFullReasoning(false);
     } catch (e: any) {
       if (e?.name === "AbortError") return;
       console.error(e);
@@ -177,11 +180,45 @@ const AIMatchingPage = () => {
 
   const currentMeeting = searchResult.recommendations[currentIndex];
 
-  const meetingTime = currentMeeting.meeting_time;
+  // ✅ Clarification 카드 여부
+  const isClarification = currentMeeting?.is_clarification === true;
+
+  // ✅ 안전 파서들
+  const safeNumber = (v: any, def = 0) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : def;
+  };
+
+  const safeText = (v: any, def = "") => {
+    if (v === null || v === undefined) return def;
+    return String(v);
+  };
+
+  const meetingTime = safeText(currentMeeting.meeting_time, "");
   const meetingDateText =
     meetingTime && !isNaN(new Date(meetingTime).getTime())
       ? new Date(meetingTime).toLocaleString("ko-KR")
       : "시간 미정";
+
+  const distanceRaw = currentMeeting.distance_km;
+  const distanceKm = Number(distanceRaw);
+  const distanceText = Number.isFinite(distanceKm)
+    ? `${distanceKm.toFixed(1)}km`
+    : "거리정보 없음";
+
+  const expectedCost = safeNumber(currentMeeting.expected_cost, 0);
+  const currentParticipants = safeNumber(
+    currentMeeting.current_participants,
+    0
+  );
+  const maxParticipants = safeNumber(currentMeeting.max_participants, 0);
+  const matchScore = safeNumber(currentMeeting.match_score, 0);
+
+  const keyPoints = Array.isArray(currentMeeting.key_points)
+    ? currentMeeting.key_points
+    : [];
+
+  const reasoning = safeText(currentMeeting.reasoning, "");
 
   return (
     <div className="ai-matching-page">
@@ -193,7 +230,7 @@ const AIMatchingPage = () => {
         <h1>AI 추천 결과</h1>
       </div>
 
-      {/* ✅ confidence 낮을 때 경고 (여기에 추가!) */}
+      {/* ✅ confidence 낮을 때 경고 */}
       {searchResult.parsed_query?.confidence < 0.6 && (
         <div className="low-confidence-notice">
           <p>🤔 검색어가 애매해서 정확한 추천이 어려울 수 있어요.</p>
@@ -231,19 +268,25 @@ const AIMatchingPage = () => {
       {/* AI 분석 카드 */}
       <div className="ai-analysis">
         <div className="match-score">
-          <div className="match-score-number">
-            {currentMeeting.match_score}%
+          <div className="match-score-number">{matchScore}%</div>
+          <div className="match-score-label">
+            {isClarification ? "안내" : "매칭률"}
           </div>
-          <div className="match-score-label">매칭률</div>
         </div>
 
         <h3>✨ 핵심 포인트</h3>
         <div className="key-points">
-          {currentMeeting.key_points.map((point, idx) => (
-            <div key={idx} className="point-item">
-              {point}
+          {keyPoints.length > 0 ? (
+            keyPoints.map((point, idx) => (
+              <div key={idx} className="point-item">
+                {point}
+              </div>
+            ))
+          ) : (
+            <div className="point-item">
+              추가 정보를 입력하면 더 정확해져요 🙂
             </div>
-          ))}
+          )}
         </div>
       </div>
 
@@ -258,30 +301,32 @@ const AIMatchingPage = () => {
         )}
 
         <div className="meeting-content">
-          <h2 className="meeting-title">{currentMeeting.title}</h2>
+          <h2 className="meeting-title">{safeText(currentMeeting.title)}</h2>
 
-          <div className="meeting-info">
-            <div className="info-row">
-              <span className="info-icon">📅</span>
-              {meetingDateText}
+          {/* ✅ Clarification 카드면 meeting-info 숨김 */}
+          {!isClarification && (
+            <div className="meeting-info">
+              <div className="info-row">
+                <span className="info-icon">📅</span>
+                {meetingDateText}
+              </div>
+              <div className="info-row">
+                <span className="info-icon">📍</span>
+                {safeText(currentMeeting.location_name, "장소 미정")} (
+                {distanceText})
+              </div>
+              <div className="info-row">
+                <span className="info-icon">💰</span>
+                {expectedCost === 0
+                  ? "무료"
+                  : `${expectedCost.toLocaleString()}원`}
+              </div>
+              <div className="info-row">
+                <span className="info-icon">👥</span>
+                현재 {currentParticipants}명 참여 중 (최대 {maxParticipants}명)
+              </div>
             </div>
-            <div className="info-row">
-              <span className="info-icon">📍</span>
-              {currentMeeting.location_name} (
-              {currentMeeting.distance_km?.toFixed(1)}km)
-            </div>
-            <div className="info-row">
-              <span className="info-icon">💰</span>
-              {currentMeeting.expected_cost === 0
-                ? "무료"
-                : `${currentMeeting.expected_cost.toLocaleString()}원`}
-            </div>
-            <div className="info-row">
-              <span className="info-icon">👥</span>
-              현재 {currentMeeting.current_participants}명 참여 중 (최대{" "}
-              {currentMeeting.max_participants}명)
-            </div>
-          </div>
+          )}
 
           {/* GPT 추론 */}
           <div className="gpt-reasoning">
@@ -289,23 +334,33 @@ const AIMatchingPage = () => {
             <div
               className={`reasoning-text ${showFullReasoning ? "expanded" : ""}`}
             >
-              {currentMeeting.reasoning}
+              {reasoning || "추천 이유를 생성하지 못했어요. 다시 시도해볼까요?"}
             </div>
-            <button
-              className="toggle-reasoning"
-              onClick={() => setShowFullReasoning(!showFullReasoning)}
-            >
-              {showFullReasoning ? "접기" : "더보기"}
-            </button>
+
+            {/* ✅ Clarification이면 더보기 버튼 굳이 필요 없음 */}
+            {!isClarification && (
+              <button
+                className="toggle-reasoning"
+                onClick={() => setShowFullReasoning(!showFullReasoning)}
+              >
+                {showFullReasoning ? "접기" : "더보기"}
+              </button>
+            )}
           </div>
 
           {/* 참여 버튼 */}
-          <button
-            className="join-button"
-            onClick={() => joinMeeting(currentMeeting.meeting_id)}
-          >
-            이 모임 참여하기
-          </button>
+          {!isClarification ? (
+            <button
+              className="join-button"
+              onClick={() => joinMeeting(currentMeeting.meeting_id)}
+            >
+              이 모임 참여하기
+            </button>
+          ) : (
+            <button className="retry-button" onClick={() => navigate("/")}>
+              🔍 다시 검색하기
+            </button>
+          )}
         </div>
       </div>
 
@@ -315,7 +370,7 @@ const AIMatchingPage = () => {
           <div className="section-header">
             <h3>다른 추천 모임</h3>
             <span className="card-count">
-              {searchResult.recommendations.length - 1}개 더
+              {Math.max(0, searchResult.recommendations.length - 1)}개 더
             </span>
           </div>
 
@@ -323,9 +378,19 @@ const AIMatchingPage = () => {
             {searchResult.recommendations.map((meeting, idx) => {
               if (idx === currentIndex) return null;
 
+              const miniIsClarification = meeting.is_clarification === true;
+
+              const miniTime = safeText(meeting.meeting_time, "");
+              const miniDateText =
+                miniTime && !isNaN(new Date(miniTime).getTime())
+                  ? new Date(miniTime).toLocaleDateString("ko-KR")
+                  : "시간 미정";
+
+              const miniMatchScore = safeNumber(meeting.match_score, 0);
+
               return (
                 <div
-                  key={meeting.meeting_id}
+                  key={`${meeting.meeting_id}-${idx}`}
                   className="mini-meeting-card"
                   onClick={() => switchMeeting(idx)}
                 >
@@ -337,18 +402,18 @@ const AIMatchingPage = () => {
                     />
                   )}
                   <div className="mini-card-content">
-                    <div className="mini-card-title">{meeting.title}</div>
-                    <div className="mini-card-info">
-                      <span>{meeting.location_name}</span>
-                      <span>
-                        ⏰{" "}
-                        {new Date(meeting.meeting_time).toLocaleDateString(
-                          "ko-KR"
-                        )}
-                      </span>
+                    <div className="mini-card-title">
+                      {safeText(meeting.title, "제목 없음")}
                     </div>
+                    <div className="mini-card-info">
+                      <span>{safeText(meeting.location_name, "미정")}</span>
+                      <span>⏰ {miniDateText}</span>
+                    </div>
+
                     <div className="mini-card-badge">
-                      매칭률 {meeting.match_score}%
+                      {miniIsClarification
+                        ? "안내 카드"
+                        : `매칭률 ${miniMatchScore}%`}
                     </div>
                   </div>
                 </div>

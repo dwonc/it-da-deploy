@@ -12,7 +12,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -42,34 +45,50 @@ public class AISearchService {
 
         // 카테고리 필터
         if (request.getCategory() != null) {
-            meetings = meetings.stream()
-                    .filter(m -> m.getCategory().equals(request.getCategory()))
-                    .collect(Collectors.toList());
+            String cat = request.getCategory().trim();
+            List<Meeting> filtered = meetings.stream()
+                    .filter(m -> m.getCategory() != null && m.getCategory().trim().equalsIgnoreCase(cat))
+                    .toList();
+            if (!filtered.isEmpty()) meetings = filtered;
         }
+
 
         // 서브카테고리 필터
         if (request.getSubcategory() != null) {
+            String sub = request.getSubcategory().trim();
+
             meetings = meetings.stream()
-                    .filter(m -> m.getSubcategory() != null &&
-                            m.getSubcategory().equals(request.getSubcategory()))
+                    .filter(m ->
+                            m.getSubcategory() != null &&
+                                    m.getSubcategory().trim().equalsIgnoreCase(sub)
+                    )
                     .collect(Collectors.toList());
         }
 
+
+
         // 시간대 필터
-        if (request.getTimeSlot() != null) {
+        if (request.getTimeSlot() != null && !request.getTimeSlot().isBlank()) {
+            Set<String> allowed = Arrays.stream(request.getTimeSlot().split(","))
+                    .map(String::trim)
+                    .map(String::toUpperCase)
+                    .collect(Collectors.toSet());
+
             meetings = meetings.stream()
-                    .filter(m -> m.getTimeSlot() != null &&
-                            m.getTimeSlot().name().equalsIgnoreCase(request.getTimeSlot()))
+                    .filter(m -> m.getTimeSlot() == null || allowed.contains(m.getTimeSlot().name()))
                     .collect(Collectors.toList());
+
         }
 
         // 분위기 필터
-        if (request.getVibe() != null) {
-            meetings = meetings.stream()
-                    .filter(m -> m.getVibe() != null &&
-                            m.getVibe().equals(request.getVibe()))
-                    .collect(Collectors.toList());
+        if (request.getVibe() != null && !request.getVibe().isBlank()) {
+            String vibe = request.getVibe().trim();
+            List<Meeting> filtered = meetings.stream()
+                    .filter(m -> m.getVibe() != null && m.getVibe().equalsIgnoreCase(vibe))
+                    .toList();
+            if (!filtered.isEmpty()) meetings = filtered;
         }
+
 
         // 비용 필터
         if (request.getMaxCost() != null) {
@@ -79,13 +98,18 @@ public class AISearchService {
         }
 
         // 위치 필터 (locationQuery)
-        if (request.getLocationQuery() != null) {
+        if (request.getLocationQuery() != null &&
+                !isNearMePhrase(request.getLocationQuery())) {
+
             String query = request.getLocationQuery().toLowerCase();
             meetings = meetings.stream()
-                    .filter(m -> (m.getLocationName() != null && m.getLocationName().toLowerCase().contains(query)) ||
-                            (m.getLocationAddress() != null && m.getLocationAddress().toLowerCase().contains(query)))
+                    .filter(m ->
+                            (m.getLocationName() != null && m.getLocationName().toLowerCase().contains(query)) ||
+                                    (m.getLocationAddress() != null && m.getLocationAddress().toLowerCase().contains(query))
+                    )
                     .collect(Collectors.toList());
         }
+
 
         // 키워드 필터 (title/description/locationName/address 중 하나라도 포함되면 통과)
         if (request.getKeywords() != null && !request.getKeywords().isEmpty()) {
@@ -95,7 +119,7 @@ public class AISearchService {
                     .toList();
 
             if (!kws.isEmpty()) {
-                meetings = meetings.stream()
+                List<Meeting> filtered = meetings.stream()
                         .filter(m -> {
                             String hay = (
                                     (m.getTitle() == null ? "" : m.getTitle()) + " " +
@@ -103,41 +127,53 @@ public class AISearchService {
                                             (m.getLocationName() == null ? "" : m.getLocationName()) + " " +
                                             (m.getLocationAddress() == null ? "" : m.getLocationAddress())
                             ).toLowerCase();
-
-                            // 하나라도 포함되면 통과(OR)
                             return kws.stream().anyMatch(hay::contains);
                         })
                         .collect(Collectors.toList());
+
+                if (!filtered.isEmpty()) meetings = filtered; // ⭐ 0개면 원본 유지
             }
         }
+
 
         // 거리 계산 (userLocation이 있으면)
         if (request.getUserLocation() != null &&
                 request.getUserLocation().getLatitude() != null &&
                 request.getUserLocation().getLongitude() != null) {
 
-            Double userLat = request.getUserLocation().getLatitude();
-            Double userLng = request.getUserLocation().getLongitude();
+            Double radius = request.getRadius();
+            boolean nearMe = request.getLocationQuery() != null && isNearMePhrase(request.getLocationQuery());
+
+            // ✅ nearMe일 때만 radius 의미있게 사용
+            if (nearMe && radius == null) radius = 10.0;
 
             meetings.forEach(m -> {
                 if (m.getLatitudeAsDouble() != null && m.getLongitudeAsDouble() != null) {
-                    double distance = calculateDistance(
-                            userLat, userLng,
-                            m.getLatitudeAsDouble(), m.getLongitudeAsDouble()
+                    double d = calculateDistance(
+                            request.getUserLocation().getLatitude(),
+                            request.getUserLocation().getLongitude(),
+                            m.getLatitudeAsDouble(),
+                            m.getLongitudeAsDouble()
                     );
-                    m.setDistanceKm(distance);
+                    m.setDistanceKm(d);
                 }
             });
 
-            // 거리순 정렬
-            meetings = meetings.stream()
-                    .sorted((m1, m2) -> {
-                        if (m1.getDistanceKm() == null) return 1;
-                        if (m2.getDistanceKm() == null) return -1;
-                        return Double.compare(m1.getDistanceKm(), m2.getDistanceKm());
-                    })
-                    .collect(Collectors.toList());
+            if (radius != null) {
+                Double finalRadius = radius;
+                meetings = meetings.stream()
+                        .filter(m -> m.getDistanceKm() != null && m.getDistanceKm() <= finalRadius)
+                        .collect(Collectors.toList());
+            }
+
+            if (nearMe) {
+                meetings = meetings.stream()
+                        .sorted(Comparator.comparing(Meeting::getDistanceKm,
+                                Comparator.nullsLast(Comparator.naturalOrder())))
+                        .collect(Collectors.toList());
+            }
         }
+
 
         // DTO 변환
         List<AIMeetingDTO> meetingDTOs = meetings.stream()
@@ -233,4 +269,11 @@ public class AISearchService {
 
         return R * c;
     }
+
+    private boolean isNearMePhrase(String q) {
+        if (q == null) return false;
+        String s = q.toLowerCase();
+        return s.contains("근처") || s.contains("주변") || s.contains("집");
+    }
+
 }
