@@ -20,6 +20,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 모임 컨트롤러 (CRUD)
@@ -171,4 +172,20 @@ public class MeetingController {
 
         return ResponseEntity.noContent().build();
     }
+
+    // MeetingController.java
+    @PostMapping("/{meetingId}/image")
+    public ResponseEntity<String> uploadMeetingImage(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long meetingId,
+            @RequestParam("image") MultipartFile image
+    ) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        String imageUrl = meetingService.uploadMeetingImage(user, meetingId, image);
+
+        return ResponseEntity.ok(imageUrl);
+    }
+
 }

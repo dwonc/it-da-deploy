@@ -80,6 +80,8 @@ const MeetingDetailPage = () => {
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
+  const API_ORIGIN = "http://localhost:8080";
+
   useEffect(() => {
     fetchMeetingDetail();
     if (user) {
@@ -88,6 +90,13 @@ const MeetingDetailPage = () => {
       checkParticipationStatus(); // 참여 상태 확인
     }
   }, [meetingId, user]);
+
+  useEffect(() => {
+    if (meeting) {
+      console.log("🖼️ 모임 이미지 URL:", meeting.imageUrl);
+      console.log("🖼️ 전체 URL:", `http://localhost:8080${meeting.imageUrl}`);
+    }
+  }, [meeting]);
 
   useEffect(() => {
     if (meeting && window.kakao && window.kakao.maps) {
@@ -457,9 +466,14 @@ const MeetingDetailPage = () => {
       <div className="hero">
         {meeting.imageUrl && (
           <img
-            src={meeting.imageUrl}
+            src={`${API_ORIGIN}${meeting.imageUrl}`}
             alt={meeting.title}
             className="hero-image"
+            onError={(e) => {
+              // ✅ 이미지 로드 실패 시 숨기기
+              e.currentTarget.style.display = "none";
+              console.error("이미지 로드 실패:", meeting.imageUrl);
+            }}
           />
         )}
         <div className="hero-content">

@@ -5,6 +5,14 @@ import { useMeetingStore } from "@/stores/useMeetingStore";
 import { CATEGORY_DATA } from "@/pages/category/CategoryDetailPage";
 import styles from "./MeetingListPage.module.css";
 
+const API_ORIGIN = import.meta.env.VITE_API_ORIGIN ?? "http://localhost:8080";
+
+const toAbsUrl = (url?: string) => {
+  if (!url) return "";
+  if (url.startsWith("http")) return url;
+  return `${API_ORIGIN}${url.startsWith("/") ? "" : "/"}${url}`;
+};
+
 // ✅ 지역 데이터
 const regionData = {
   서울: [
@@ -457,7 +465,10 @@ const MeetingListPage = () => {
       <div className={styles.page}>
         <header className={styles.header}>
           <div className={styles.headerContent}>
-            <button className={styles.backBtn} onClick={() => navigate(-1)}>
+            <button
+              className={styles.backBtn}
+              onClick={() => navigate("/category")}
+            >
               ← 모임 둘러보기
             </button>
             <h1 className={styles.logo} onClick={() => navigate("/")}>
@@ -664,34 +675,29 @@ const MeetingListPage = () => {
               <div
                 key={m.meetingId}
                 className={viewMode === "grid" ? styles.card : styles.listItem}
-                onClick={() => navigate(`/meeting/${m.meetingId}`)}
+                onClick={() => navigate(`/meetings/${m.meetingId}`)}
               >
                 {viewMode === "grid" ? (
                   <>
                     <div className={styles.image}>
-                      {m.imageUrl ? (
-                        <img
-                          src={m.imageUrl}
-                          alt={m.title}
-                          style={{
-                            width: "100%",
-                            height: "100%",
-                            objectFit: "cover",
-                          }}
-                        />
-                      ) : (
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            height: "100%",
-                            fontSize: "4rem",
-                          }}
-                        >
-                          📸
-                        </div>
-                      )}
+                      <img
+                        src={toAbsUrl(m.imageUrl)}
+                        alt={m.title}
+                        loading="lazy"
+                        decoding="async"
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          if (img.dataset.fallbackApplied === "1") return;
+                          img.dataset.fallbackApplied = "1";
+                          img.src =
+                            "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400";
+                        }}
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                        }}
+                      />
                       {m.isFull && <div className={styles.badge}>마감</div>}
                     </div>
                     <div className={styles.content}>

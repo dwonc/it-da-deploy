@@ -17,11 +17,17 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
@@ -34,6 +40,9 @@ public class MeetingService {
 
     private final MeetingRepository meetingRepository;
     private final ParticipationRepository participationRepository;
+
+    // ✅ 이미지 저장 경로 설정 (application.yml에서 관리하는 게 더 좋음)
+    private final String uploadDir = "uploads/meetings/";
 
     /**
      * 모임 생성
@@ -302,6 +311,62 @@ public class MeetingService {
 
     private int calculateDDay(LocalDateTime meetingTime) {
         return (int) ChronoUnit.DAYS.between(LocalDate.now(), meetingTime.toLocalDate());
+    }
+
+    @Transactional
+    public String uploadMeetingImage(User user, Long meetingId, MultipartFile image) {
+        log.info("📸 모임 이미지 업로드 시작 - meetingId: {}, userId: {}", meetingId, user.getUserId());
+
+        // 1. 모임 조회
+        Meeting meeting = meetingRepository.findById(meetingId)
+                .orElseThrow(() -> new IllegalArgumentException("모임을 찾을 수 없습니다."));
+
+        // 2. 권한 확인 (주최자만 이미지 변경 가능)
+        if (!meeting.getOrganizer().getUserId().equals(user.getUserId())) {
+            throw new IllegalArgumentException("모임 주최자만 이미지를 변경할 수 있습니다.");
+        }
+
+        // 3. 파일 검증
+        if (image.isEmpty()) {
+            throw new IllegalArgumentException("이미지 파일이 비어있습니다.");
+        }
+
+        String contentType = image.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new IllegalArgumentException("이미지 파일만 업로드 가능합니다.");
+        }
+
+        // 4. 파일 저장
+        try {
+            // 업로드 디렉토리 생성
+            Path uploadPath = Paths.get(uploadDir);
+            if (!Files.exists(uploadPath)) {
+                Files.createDirectories(uploadPath);
+            }
+
+            // 고유한 파일명 생성
+            String originalFilename = image.getOriginalFilename();
+            String extension = originalFilename.substring(originalFilename.lastIndexOf("."));
+            String savedFilename = UUID.randomUUID().toString() + extension;
+
+            // 파일 저장
+            Path filePath = uploadPath.resolve(savedFilename);
+            Files.copy(image.getInputStream(), filePath);
+
+            // ✅ 절대 URL로 반환 (프론트엔드에서 바로 사용 가능)
+            String imageUrl = "http://localhost:8080/uploads/meetings/" + savedFilename;
+
+            // 6. Meeting 엔티티에 이미지 URL 저장
+            meeting.updateImageUrl(imageUrl);
+
+            log.info("✅ 이미지 업로드 완료 - imageUrl: {}", imageUrl);
+
+            return imageUrl;
+
+        } catch (IOException e) {
+            log.error("❌ 파일 저장 실패", e);
+            throw new RuntimeException("파일 저장에 실패했습니다.", e);
+        }
     }
 
 }

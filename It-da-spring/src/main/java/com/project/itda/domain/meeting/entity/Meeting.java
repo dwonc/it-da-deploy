@@ -414,4 +414,8 @@ public class Meeting {
         if (meetingTime == null) return null;
         return meetingTime.toLocalDate().toString();
     }
+
+    public String updateImageUrl(String imageUrl) {
+        return this.imageUrl = imageUrl;
+    }
 }

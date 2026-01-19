@@ -2,6 +2,15 @@
 import { useNavigate } from "react-router-dom";
 import type { AiMeeting } from "@/types/ai.types";
 import "./AiRecommendCard.css";
+import SafeImage from "../common/SafeImage";
+
+const API_ORIGIN = import.meta.env.VITE_API_ORIGIN ?? "http://localhost:8080";
+
+const toAbsUrl = (url?: string) => {
+  if (!url) return "";
+  if (url.startsWith("http")) return url;
+  return `${API_ORIGIN}${url.startsWith("/") ? "" : "/"}${url}`;
+};
 
 type AIRecommendCardProps = {
   meeting: AiMeeting; // 너 프로젝트 타입(AiMeeting/Meeting) 있으면 그걸로 교체
@@ -53,11 +62,7 @@ const AIRecommendCard = ({
 
       <div className="recommend-card" onClick={handleCardClick}>
         <div className="card-image">
-          {meeting.imageUrl ? (
-            <img src={meeting.imageUrl} alt={meeting.title} />
-          ) : (
-            <div className="image-placeholder">🎯</div>
-          )}
+          <SafeImage src={meeting.imageUrl} alt={meeting.title} />
         </div>
 
         <div className="card-info">

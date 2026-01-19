@@ -359,15 +359,15 @@ const MeetingEditPage = () => {
       else if (hour >= 18 && hour < 24) timeSlot = "EVENING";
       else timeSlot = "NIGHT";
 
-      // ✅ ISO-8601 완전한 형식으로 변경
-      const meetingDateTime = `${formData.meetingDate}T${formData.meetingTime}:00.000`;
+      const meetingDateTime = `${formData.meetingDate}T${formData.meetingTime}:00`;
 
+      // ✅ 1단계: 모임 정보 수정
       const requestData = {
         title: formData.title,
         description: formData.description,
         category: formData.category,
         subcategory: formData.subcategory,
-        meetingTime: meetingDateTime, // ✅ 변경된 형식
+        meetingTime: meetingDateTime,
         locationName: selectedLocation.name,
         locationAddress: formData.detailAddress
           ? `${selectedLocation.address} (${formData.detailAddress})`
@@ -381,32 +381,45 @@ const MeetingEditPage = () => {
         timeSlot: timeSlot,
       };
 
-      console.log("📤 수정 요청 데이터:", requestData);
-
       await axios.put(
         `http://localhost:8080/api/meetings/${meetingId}`,
         requestData,
         { withCredentials: true }
       );
 
+      // ✅ 2단계: 이미지가 변경된 경우 업로드
+      if (uploadedImage) {
+        const formData = new FormData();
+        formData.append("image", uploadedImage);
+
+        await axios.post(
+          `http://localhost:8080/api/meetings/${meetingId}/image`,
+          formData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+            },
+            withCredentials: true,
+          }
+        );
+      }
+
       alert("✅ 모임이 수정되었습니다!");
       navigate(`/meetings/${meetingId}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error("모임 수정 실패:", error);
-      alert("모임 수정에 실패했습니다.");
+
+      if (error.response?.data?.message) {
+        alert(error.response.data.message);
+      } else if (error.response?.status === 400) {
+        alert("입력 정보를 확인해주세요.");
+      } else {
+        alert("모임 수정에 실패했습니다.");
+      }
     } finally {
       setLoading(false);
     }
   };
-
-  if (initialLoading) {
-    return (
-      <div className="loading-container">
-        <div className="spinner"></div>
-        <p>로딩 중...</p>
-      </div>
-    );
-  }
 
   const today = new Date();
   const yyyy = today.getFullYear();

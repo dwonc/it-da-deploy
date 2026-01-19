@@ -4,6 +4,14 @@ import { useMeetingStore } from "@/stores/useMeetingStore";
 import { Category, CategoryType } from "@/types/category.types";
 import "./CategoryDetailPage.css";
 
+const API_ORIGIN = import.meta.env.VITE_API_ORIGIN ?? "http://localhost:8080";
+
+const toAbsUrl = (url?: string) => {
+  if (!url) return "";
+  if (url.startsWith("http")) return url;
+  return `${API_ORIGIN}${url.startsWith("/") ? "" : "/"}${url}`;
+};
+
 // ✅ 카테고리 데이터
 export const CATEGORY_DATA: Record<CategoryType, Omit<Category, "name">> = {
   스포츠: {
@@ -424,6 +432,9 @@ const CategoryDetailPage = () => {
   // ✅ 인기 모임 상위 2개만 표시
   const popularMeetings = meetings.slice(0, 2);
 
+  console.log("store meetings length =", meetings.length);
+  console.log("popularMeetings =", popularMeetings);
+
   return (
     <div className="category-detail-page">
       <header className="header">
@@ -540,8 +551,17 @@ const CategoryDetailPage = () => {
                   <div className="meeting-image">
                     {meeting.imageUrl ? (
                       <img
-                        src={meeting.imageUrl}
+                        src={toAbsUrl(meeting.imageUrl)}
                         alt={meeting.title}
+                        loading="lazy"
+                        decoding="async"
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          if (img.dataset.fallbackApplied === "1") return;
+                          img.dataset.fallbackApplied = "1";
+                          img.src =
+                            "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400";
+                        }}
                         style={{
                           width: "100%",
                           height: "100%",
@@ -549,7 +569,9 @@ const CategoryDetailPage = () => {
                         }}
                       />
                     ) : (
-                      categoryData.icon
+                      <span style={{ fontSize: "2rem" }}>
+                        {categoryData.icon}
+                      </span>
                     )}
                   </div>
                   <div className="meeting-info">
