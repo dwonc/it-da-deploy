@@ -125,8 +125,32 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
         });
     },
 
+    // ✅ 수정: 알림 목록의 프로필 정보 실시간 업데이트
     updateUserProfile: (userId, data) => {
         console.log('updateUserProfile called:', userId, data);
+        set((state) => ({
+            notifications: state.notifications.map((n) => {
+                // 팔로우 알림에서 해당 유저 정보 업데이트
+                if (n.fromUserId === userId) {
+                    return {
+                        ...n,
+                        fromUsername: data.username || n.fromUsername,
+                        fromProfileImage: data.profileImage || n.fromProfileImage,
+                        title: data.username ? `${data.username}님` : n.title,
+                    };
+                }
+                // 메시지 알림에서 해당 유저 정보 업데이트
+                if (n.senderId === userId) {
+                    return {
+                        ...n,
+                        senderName: data.username || n.senderName,
+                        senderProfileImage: data.profileImage || n.senderProfileImage,
+                        title: data.username ? `${data.username}님의 새 메시지` : n.title,
+                    };
+                }
+                return n;
+            }),
+        }));
     },
 
     addMessageNotification: (data) => {
