@@ -1,6 +1,6 @@
 import React, { useState, useEffect,useRef } from "react";
 import {useNavigate, useParams} from "react-router-dom";
-import { useChatStore,ChatMessage } from "@/stores/useChatStore.ts";
+import { useChatStore,type ChatMessage } from "@/stores/useChatStore.ts";
 import { chatApi } from "@/api/chat.api.ts"; // ChatMessage 타입 활용
 import ChatMessageItem from "../../components/chat/ChatMessage";
 import ChatMemberList from "../../components/chat/ChatMemberList";
@@ -12,6 +12,7 @@ import "./ChatRoomPage.css";
 import BillInputModal from "../../components/chat/BillInputModal";
 import PollInputModal from "../../components/chat/PollInputModal";
 import api from '@/api/axios.config';
+
 
 interface BillData {
     totalAmount: number;
@@ -106,10 +107,10 @@ const ChatRoomPage: React.FC = () => {
                 const oldMessages = await chatApi.getChatMessages(Number(roomId), page + 1,50);
 
                 if (oldMessages && oldMessages.length > 0) {
-                    const validatedOldMessages = oldMessages.map(msg => ({
+                    const validatedOldMessages: ChatMessage[] = (oldMessages as any[]).map(msg => ({
                         ...msg,
                         senderNickname: msg.senderNickname || "사용자",
-                        unreadCount: 0,
+                        unreadCount: Number(msg.unreadCount ?? 0),
                         sentAt: msg.sentAt || new Date().toISOString()
                     }));
 
@@ -154,8 +155,13 @@ const ChatRoomPage: React.FC = () => {
         try {
             if (type === "BILL") {
                 const perPerson = Math.floor(data.totalAmount / data.participantCount);
+                const updatedParticipants = data.participants.map((p: any) => ({
+                    ...p,
+                    // 참여자 ID와 현재 로그인 유저 ID 비교 (타입 일치를 위해 Number 사용)
+                    isPaid: Number(p.userId) === Number(currentUser?.userId)
+                }));
                 const content = `💰 정산 요청: 1인당 ${perPerson.toLocaleString()}원`;
-                const metadata = { ...data, amountPerPerson: perPerson };
+                const metadata = { ...data,participants: updatedParticipants, amountPerPerson: perPerson };
 
                 chatApi.sendMessage(
                     Number(roomId),
@@ -199,10 +205,15 @@ const ChatRoomPage: React.FC = () => {
                 // 1. 초기 메시지 로드 (독립적)
                 try {
                     const history = await chatApi.getChatMessages(Number(roomId), 0, 50);
-                    const validatedHistory = history.map(msg => ({
+                    const validatedHistory: ChatMessage[] = (history as any[]).map(msg => ({
                         ...msg,
                         senderNickname: msg.senderNickname || "사용자",
-                        unreadCount: 0
+                        content: msg.content || "",
+                        unreadCount: Number(msg.unreadCount ?? 0),
+                        sentAt: msg.sentAt || new Date().toISOString(),
+                        // 만약 msg.type이 string이라 에러가 난다면 아래와 같이 단언
+                        type: msg.type as ChatMessage['type'],
+                        metadata: msg.metadata || null
                     }));
                     setMessages(validatedHistory);
                 } catch (e) {
@@ -212,7 +223,7 @@ const ChatRoomPage: React.FC = () => {
                 // 2. 읽음 처리 (실패해도 무방하므로 catch 처리)
                 try {
                     await chatApi.markAsRead(Number(roomId), currentUser.email);
-                    chatApi.sendReadEvent(Number(roomId), currentUser.email);
+                    // chatApi.sendReadEvent(Number(roomId), currentUser.email);
                     markAllAsRead();
                 } catch (e) {
                     console.warn("⚠️ 읽음 처리 실패 (API 확인 필요):", e);
@@ -269,12 +280,16 @@ const ChatRoomPage: React.FC = () => {
             chatApi.connect(Number(roomId), currentUser.email, (newMsg: any) => {
                 if (!isSubscribed) return;
 
-                if (newMsg.type === 'BILL_UPDATE' || newMsg.type === 'VOTE_UPDATE') {
+                if (newMsg.type === 'BILL_UPDATE') {
+                    const targetId = Number(newMsg.targetMessageId || newMsg.metadata.messageId);
                     addMessage({
                         ...newMsg,
-                        messageId: Number(newMsg.targetMessageId || newMsg.messageId),
-                        // ✅ 핵심: 업데이트 신호를 받아도 스토어가 찾을 수 있게 원본 타입(BILL/POLL)을 명시해야 함
-                        type: newMsg.type === 'BILL_UPDATE' ? 'BILL' : 'POLL'
+                        messageId: targetId, // 원본 메시지 ID 고정
+                        type: 'BILL',        // 타입을 BILL로 보내야 ChatMessage.tsx가 정산 UI를 유지함
+                        // metadata는 서버에서 온 업데이트된 객체를 그대로 사용
+                        metadata: typeof newMsg.metadata === 'string'
+                            ? JSON.parse(newMsg.metadata)
+                            : newMsg.metadata
                     });
                     return; // 업데이트용 신호이므로 아래의 중복 체크 로직을 타지 않게 종료
                 }
@@ -282,12 +297,12 @@ const ChatRoomPage: React.FC = () => {
                 const isMine = Number(newMsg.senderId) === Number(currentUser.userId) ||
                     newMsg.senderEmail === currentUser.email;
 
+                const serverCount = Number(newMsg.unreadCount ?? 0);
+
                 const validatedMsg: ChatMessage = {
                     ...newMsg,
+                    unreadCount: serverCount,
                     senderNickname: newMsg.senderNickname || "사용자",
-                    unreadCount: isMine
-                        ? Number(newMsg.unreadCount ?? 0)
-                        : Math.max(0, Number(newMsg.unreadCount ?? 0) - 1),
                     sentAt: newMsg.sentAt || new Date().toISOString(),
                     senderId: Number(newMsg.senderId),
                     messageId: Number(newMsg.messageId) || Date.now(),
@@ -299,15 +314,23 @@ const ChatRoomPage: React.FC = () => {
                 addMessage(validatedMsg);
 
 
-                if (!isMine && newMsg.type === 'TALK') {
-                    chatApi.sendReadEvent(Number(roomId), currentUser.email);
-                }
+                // if (!isMine && (newMsg.type === 'TALK' || newMsg.type === 'IMAGE' || newMsg.type === 'BILL' || newMsg.type === 'POLL')) {
+                //     chatApi.sendReadEvent(Number(roomId), currentUser.email);
+                // }
+
+                console.log(`📩 메시지 수신 -fif (currentUser && readData.email !== currentUser.email) 타입: ${isMine ? '발송' : '수신'}, unreadCount: ${serverCount}`);
+
             }, (readData: any) => {
                 console.log("📖 읽음 이벤트 수신:", readData);
                 // ✅ 핵심 수정 3: 상대방이 읽었을 때만 내 화면의 숫자를 줄임
                 // 내가 읽은 이벤트는 이미 markAllAsRead() 등으로 처리되므로 중복 차감 방지
-                if (readData.email !== currentUser?.email) {
+                if (currentUser && readData.email !== currentUser.email) {
+                    // 💡 추가 검증: 만약 특정 유저가 '이미' 방에 있었다면 중복 차감하지 않도록
+                    // 백엔드에서 준 실시간 숫자가 0보다 클 때만 수행
+                    console.log(`✅ 타인(${readData.email}) 읽음 확인: 숫자 1 차감`);
                     decrementUnreadCount();
+                } else {
+                    console.log("ℹ️ 본인 이벤트 혹은 중복 신호: 차감 무시");
                 }
             });
         } return () => {
