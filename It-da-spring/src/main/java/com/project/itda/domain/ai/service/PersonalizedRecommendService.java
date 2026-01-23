@@ -56,9 +56,8 @@ public class PersonalizedRecommendService {
             Double userRatingStd = Optional.ofNullable(reviewRepository.getRatingStdByUserId(userId))
                     .orElse(0.5);
 
-            // 3. 후보 모임 조회
-            List<Meeting> candidateMeetings = meetingRepository
-                    .findTop50ByOrderByCreatedAtDesc();
+            // ⭐ 3. 선호도 기반 후보 필터링
+            List<Meeting> candidateMeetings = getCandidateMeetings(user, userPref);
 
             if (candidateMeetings.isEmpty()) {
                 log.warn("⚠️ 추천 가능한 모임 없음");
@@ -67,14 +66,14 @@ public class PersonalizedRecommendService {
 
             // 4. FastAPI 요청 생성
             PersonalizedRecommendRequest request = PersonalizedRecommendRequest.builder()
-                    .userId(userId)  // ⭐ 수정
+                    .userId(userId)
                     .userLat(user.getLatitude() != null ? user.getLatitude() : 37.5665)
                     .userLng(user.getLongitude() != null ? user.getLongitude() : 126.9780)
                     .userInterests(userPref != null && userPref.getInterests() != null
                             ? userPref.getInterests()
                             : "[]")
                     .userTimePreference(userPref != null && userPref.getTimePreference() != null
-                            ? String.valueOf(userPref.getTimePreference()).toUpperCase()
+                            ? userPref.getTimePreference()
                             : "AFTERNOON")
                     .userLocationPref(userPref != null && userPref.getLocationType() != null
                             ? userPref.getLocationType().name()
@@ -98,7 +97,7 @@ public class PersonalizedRecommendService {
                     .userMeetingCount(userMeetingCount.intValue())
                     .userRatingStd(userRatingStd)
                     .candidateMeetings(candidateMeetings.stream()
-                            .map(this::convertToDto)  // ⭐ 변경
+                            .map(this::convertToDto)
                             .collect(Collectors.toList()))
                     .build();
 
@@ -143,6 +142,91 @@ public class PersonalizedRecommendService {
             return meetingRepository.findTopByOrderByCreatedAtDesc()
                     .orElse(null);
         }
+    }
+
+    /**
+     * ⭐ 선호도 기반 후보 필터링 (수정 버전)
+     */
+    private List<Meeting> getCandidateMeetings(User user, UserPreference userPref) {
+        // 1) 전체 모임 조회 (100개)
+        List<Meeting> allMeetings = meetingRepository.findTop100ByOrderByCreatedAtDesc();
+
+        if (userPref == null) {
+            log.info("🔍 선호도 없음 → 전체 50개 반환");
+            return allMeetings.subList(0, Math.min(50, allMeetings.size()));
+        }
+
+        // 2) 선호도 필터링
+        List<Meeting> filtered = allMeetings.stream()
+                .filter(meeting -> {
+
+                    // ⭐ 시간대 필터 (수정!)
+                    if (userPref.getTimePreference() != null
+                            && !userPref.getTimePreference().isEmpty()) {
+
+                        String timePreference = userPref.getTimePreference().toUpperCase();
+
+                        // "FLEXIBLE" 포함 시 시간대 제약 없음
+                        if (!timePreference.contains("FLEXIBLE")) {
+                            // "MORNING,EVENING" 같은 케이스 파싱
+                            Set<String> preferredTimes = new HashSet<>(
+                                    Arrays.asList(timePreference.split(","))
+                            );
+
+                            String meetingTimeSlot = meeting.getTimeSlot().name();
+
+                            // 모임 시간대가 선호 시간대에 없으면 제외
+                            if (!preferredTimes.contains(meetingTimeSlot)) {
+                                return false; // ❌ 시간대 불일치
+                            }
+                        }
+                    }
+
+                    // ⭐ 장소 타입 필터 (수정!)
+                    if (userPref.getLocationType() != null) {
+                        String userLocPref = userPref.getLocationType().name();
+                        String meetingLoc = meeting.getLocationType().name();
+
+                        // "BOTH"가 아닌 경우만 필터링
+                        if (!"BOTH".equals(userLocPref) && !userLocPref.equals(meetingLoc)) {
+                            return false; // ❌ 장소 타입 불일치
+                        }
+                    }
+
+                    // ⭐ 관심사 필터 (최소 1개 매칭)
+                    if (userPref.getInterests() != null && !userPref.getInterests().isEmpty()) {
+                        String interests = userPref.getInterests().toLowerCase();
+                        String category = meeting.getCategory().toLowerCase();
+                        String subcategory = (meeting.getSubcategory() != null)
+                                ? meeting.getSubcategory().toLowerCase() : "";
+
+                        // 관심사에 category나 subcategory가 포함되어야 함
+                        boolean hasMatch = interests.contains(category)
+                                || interests.contains(subcategory)
+                                || category.contains(interests.split(",")[0].trim())  // ⭐ 역방향도 체크
+                                || (!subcategory.isEmpty() && subcategory.contains(interests.split(",")[0].trim()));
+
+                        if (!hasMatch) {
+                            return false; // ❌ 관심사 0개
+                        }
+                    }
+
+                    return true; // ✅ 통과
+                })
+                .limit(50)
+                .collect(Collectors.toList());
+
+        log.info("🔍 선호도 필터링: {} → {} (시간={}, 장소={}, 관심사={})",
+                allMeetings.size(), filtered.size(),
+                userPref.getTimePreference(), userPref.getLocationType(), userPref.getInterests());
+
+        // 3) 필터링 결과가 너무 적으면 완화
+        if (filtered.size() < 10) {
+            log.warn("⚠️ 필터링 결과 부족 ({}) → 전체 사용", filtered.size());
+            return allMeetings.subList(0, Math.min(50, allMeetings.size()));
+        }
+
+        return filtered;
     }
 
     /**

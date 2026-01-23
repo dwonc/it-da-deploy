@@ -170,4 +170,7 @@ public interface MeetingRepository extends JpaRepository<Meeting, Long> {
      * ⭐ 가장 최근 생성된 모임 1개 조회 (에러 처리용)
      */
     Optional<Meeting> findTopByOrderByCreatedAtDesc();
+
+    // 이 메서드가 있어야 함
+    List<Meeting> findTop100ByOrderByCreatedAtDesc();
 }
