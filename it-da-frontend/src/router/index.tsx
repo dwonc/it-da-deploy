@@ -24,8 +24,19 @@ import UserProfileById from "@/pages/mypage/UserProfileById";
 import ChatPreviewPage from "@/pages/meeting/ChatPreviewPage";
 import MeetingManagePage from "@/pages/meeting/MeetingManagePage";
 import MeetingEditPage from "@/pages/meeting/MeetingEditPage";
-// ✅ 내 모임 페이지 import 추가
 import MyMeetingsListPage from "@/pages/mypage/MyMeetingsListPage";
+import AdminMeetingDetailPage from "@/pages/admin/AdminMeetingDetailPage";
+
+// 👇 관리자 페이지 import 추가
+import AdminLayout from "@/pages/admin/AdminLayout";
+import AdminDashboardPage from "@/pages/admin/AdminDashboardPage";
+import UserManagePage from "@/pages/admin/UserManagePage";
+import AdminMeetingManagePage from "@/pages/admin/AdminMeetingManagePage";
+import ReportManagePage from "@/pages/admin/ReportManagePage";
+import NoticeManagePage from "@/pages/admin/NoticeManagePage";
+import SettingsPage from "@/pages/admin/SettingsPage";
+import InquiryManagePage from "@/pages/admin/InquiryManagePage.tsx";
+import AdminUserDetailPage from '@/pages/admin/AdminUserDetailPage';
 
 console.log("ROUTER LOADED ✅");
 console.log("ROUTER VERSION ✅", "2026-01-21 내 모임 페이지 분리");
@@ -186,7 +197,51 @@ export const router = createBrowserRouter(
                 </ProtectedRoute>
             ),
         },
-    ],
+    // 👇 관리자 라우트 추가
+    {
+        path: "/admin",
+        element: <AdminLayout />,
+        children: [
+            {
+                path: "dashboard",
+                element: <AdminDashboardPage />,
+            },
+            {
+                path: "users",
+                element: <UserManagePage />,
+            },
+            {
+                path: "users/:userId",
+                element: <AdminUserDetailPage />,
+            },
+            {
+                path: "meetings",
+                element: <AdminMeetingManagePage />,
+            },
+            {
+                path: "meetings/:meetingId",
+                element: <AdminMeetingDetailPage />,
+            },
+            {
+                path: "reports",
+                element: <ReportManagePage />,
+            },
+            {
+                path: "inquiries",
+                element: <InquiryManagePage />,
+            },
+            {
+                path: "notices",
+                element: <NoticeManagePage />,
+            },
+            {
+                path: "settings",
+                element: <SettingsPage />,
+            },
+        ],
+    },
+],
+
     {
         future: {
             v7_startTransition: true,

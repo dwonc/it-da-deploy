@@ -62,26 +62,18 @@ const MeetingCreatePage = () => {
   const [imagePreview, setImagePreview] = useState<string>("");
 
   // 카테고리 옵션
-  const categories = [
-    { value: "", label: "카테고리를 선택하세요" },
-    { value: "스포츠", label: "🏃 스포츠·액티비티" },
-    { value: "맛집", label: "🍽️ 맛집·카페" },
-    { value: "문화예술", label: "🎨 문화·예술" },
-    { value: "스터디", label: "📚 스터디·세미나" },
-    { value: "취미활동", label: "🎸 취미·여가" },
-    { value: "소셜", label: "🎉 친목·네트워킹" },
-  ];
+    const categories = [
+        { value: "스포츠", label: "🏃 스포츠·액티비티" },
+        { value: "맛집", label: "🍽️ 맛집" },
+        { value: "카페", label: "☕ 카페" },
+        { value: "문화예술", label: "🎨 문화·예술" },
+        { value: "스터디", label: "📚 스터디·세미나" },
+        { value: "취미활동", label: "🎸 취미·여가" },
+        { value: "소셜", label: "🎉 친목·네트워킹" },
+    ];
 
   const subcategoryMap: Record<string, string[]> = {
-    스포츠: [
-      "러닝",
-      "축구",
-      "배드민턴",
-      "등산",
-      "요가",
-      "사이클링",
-      "클라이밍",
-    ],
+    스포츠: ["러닝", "축구", "배드민턴", "등산", "요가", "사이클링", "클라이밍"],
     맛집: ["한식", "중식", "일식", "양식", "이자카야", "파인다이닝"],
     카페: ["카페투어", "브런치", "디저트", "베이커리", "티하우스"],
     문화예술: ["전시회", "공연", "갤러리", "공방체험", "사진촬영", "버스킹"],

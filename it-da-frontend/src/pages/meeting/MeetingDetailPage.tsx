@@ -83,6 +83,15 @@ const MeetingDetailPage = () => {
 
     const API_ORIGIN = "http://localhost:8080";
 
+    if (!meetingId) {
+        return (
+            <div className="error-container">
+                <p>잘못된 접근입니다. 모임 ID가 없습니다.</p>
+                <button onClick={() => navigate("/meetings")}>목록으로</button>
+            </div>
+        );
+    }
+
     useEffect(() => {
         fetchMeetingDetail();
         if (user) {
@@ -124,7 +133,7 @@ const MeetingDetailPage = () => {
 
                     console.log("✅ 참여자 API 응답:", participantsRes.data);
 
-                    let participantsList = [];
+                    let participantsList: Participant[] = [];
                     if (Array.isArray(participantsRes.data)) {
                         participantsList = participantsRes.data;
                     } else if (participantsRes.data.participants) {
@@ -133,7 +142,7 @@ const MeetingDetailPage = () => {
 
                     meetingData.participants = participantsList
                         .filter((p: any) => p.status === "APPROVED")
-                        .map((p: any) => ({
+                        .map((p: any): Participant => ({
                             userId: p.userId,
                             username: p.username,
                             profileImage: p.profileImage,
@@ -765,7 +774,7 @@ const MeetingDetailPage = () => {
             <MeetingManageModal
                 isOpen={isManageModalOpen}
                 onClose={() => setIsManageModalOpen(false)}
-                meetingId={meetingId!}
+                meetingId={meetingId}
                 meetingTitle={meeting?.title || ""}
                 onUpdate={fetchMeetingDetail}
             />
@@ -774,7 +783,7 @@ const MeetingDetailPage = () => {
             <ChatPreviewModal
                 isOpen={isPreviewModalOpen}
                 onClose={() => setIsPreviewModalOpen(false)}
-                meetingId={meetingId!}
+                meetingId={meetingId}
                 participationStatus={participationStatus}
                 onEnterChat={() => {
                     setIsPreviewModalOpen(false);
