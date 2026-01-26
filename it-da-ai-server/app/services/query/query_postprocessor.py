@@ -24,7 +24,7 @@ class QueryPostProcessor:
         r"(말고\s*다른|빼고\s*다른|제외하고)"
     ]
 
-    # ✅ 감정/상태 매핑 추가
+    # ✅ 감정/상태 매핑 (순서 중요!)
     EMOTION_MAPPINGS = {
         # 피로/졸음 → 카페/휴식
         "tired": {
@@ -44,16 +44,25 @@ class QueryPostProcessor:
             "message": "분노/스트레스 감지"
         },
 
-        # 외로움/우울 → 소셜
+        # ✅ 우울/슬픔 → 편안한 (먼저 체크!)
+        "sad": {
+            "keywords": ["우울", "우울해", "슬퍼", "울적", "심기불편", "기분안좋", "슬프"],
+            "category": "카페",  # ✅ None → 카페로 변경!
+            "vibe": "여유로운",
+            "confidence": 0.7,  # ✅ 0.6 → 0.7로 상향
+            "message": "우울/슬픔 감지"
+        },
+
+        # ✅ 외로움/심심 → 소셜 (우울 제거!)
         "lonely": {
-            "keywords": ["외로", "심심", "우울", "쓸쓸", "외롭", "심심해"],
-            "category": "소셜",
+            "keywords": ["외로", "심심", "쓸쓸", "외롭", "심심해"],  # ✅ "우울" 제거
+            "category": None,  # ✅ 강제 변경 방지
             "vibe": "즐거운",
-            "confidence": 0.7,
+            "confidence": 0.65,
             "message": "외로움 감지"
         },
 
-        # 배고픔 → 맛집 (이미 있음, 체계화)
+        # 배고픔 → 맛집
         "hungry": {
             "keywords": ["배고", "배고파", "배고프", "배가고", "허기", "출출"],
             "category": "맛집",
@@ -74,20 +83,29 @@ class QueryPostProcessor:
         # 지루함 → 문화예술/소셜
         "bored": {
             "keywords": ["지루", "무료", "재미없"],
-            "category": "문화예술",
+            "category": None,
             "vibe": "즐거운",
             "confidence": 0.65,
             "message": "지루함 감지"
         },
 
-        # 불안/긴장 → 스터디/문화예술
+        # 불안/긴장 → 편안한 활동
         "anxious": {
             "keywords": ["불안", "긴장", "초조"],
-            "category": "문화예술",
+            "category": None,
             "vibe": "여유로운",
             "confidence": 0.65,
             "message": "불안 감지"
-        }
+        },
+
+        # ✅ 힐링/번아웃 → 카페
+        "healing": {
+            "keywords": ["힐링", "번아웃", "휴식", "쉬고싶", "쉬고", "쉬어"],
+            "category": "카페",
+            "vibe": "힐링",
+            "confidence": 0.75,
+            "message": "힐링/휴식 감지"
+        },
     }
 
     def __init__(self, normalizer):
@@ -122,38 +140,6 @@ class QueryPostProcessor:
         q = self._fix_study(text, q)  # 공부/스터디
         q = self._fix_gender_hint(text, q)  # 성별 힌트
         q = self._fix_temperature(text, q)  # 온도
-
-        return q
-
-    def _fix_emotion_state(self, text: str, q: dict) -> dict:
-        """감정/신체상태 키워드 처리"""
-
-        # 이미 category가 확실하면 스킵 (GPT가 잘 파싱한 경우)
-        current_conf = float(q.get("confidence", 0) or 0)
-        if q.get("category") and current_conf >= 0.8:
-            return q
-
-        # 감정 매칭
-        for emotion_type, mapping in self.EMOTION_MAPPINGS.items():
-            keywords = mapping["keywords"]
-
-            if any(kw in text for kw in keywords):
-                # category가 없거나 confidence가 낮을 때만 적용
-                if not q.get("category") or current_conf < 0.7:
-                    q["category"] = mapping["category"]
-
-                    if mapping["vibe"]:
-                        q["vibe"] = mapping["vibe"]
-
-                    q["confidence"] = max(current_conf, mapping["confidence"])
-
-                    logger.info(f"[POST_FIX] {mapping['message']} → category={mapping['category']}")
-
-                    # 특수 처리
-                    if emotion_type == "hungry":
-                        q.pop("subcategory", None)
-
-                    break
 
         return q
 
@@ -284,7 +270,8 @@ class QueryPostProcessor:
 
             self._add_keywords(q, ["보드게임", "방탈출", "퍼즐", "추리"], limit=10)
 
-            if not q.get("vibe"):
+            # ✅ emotion vibe 보호
+            if not q.get("emotion_vibe_locked") and not q.get("vibe"):
                 q["vibe"] = "즐거운"
             q["confidence"] = max(float(q.get("confidence", 0) or 0), 0.75)
 
@@ -344,7 +331,7 @@ class QueryPostProcessor:
         if any(w in text for w in culture_words) and not any(w in text for w in sports_words):
             q["category"] = "문화예술"
             q.pop("subcategory", None)
-            if not q.get("vibe"):
+            if not q.get("emotion_vibe_locked") and not q.get("vibe"):
                 q["vibe"] = "여유로운"
             q["confidence"] = max(float(q.get("confidence", 0) or 0), 0.70)
 
@@ -415,47 +402,50 @@ class QueryPostProcessor:
         if any(k in text for k in study_keywords):
             if q.get("category") == "소셜":
                 q["category"] = "스터디"
-            if not q.get("vibe"):
+
+            # ✅ emotion vibe가 잠겨있지 않을 때만 변경
+            if not q.get("emotion_vibe_locked") and not q.get("vibe"):
                 q["vibe"] = "집중"
+
             q["confidence"] = max(float(q.get("confidence", 0) or 0), 0.65)
 
         return q
 
     def _fix_emotion_state(self, text: str, q: dict) -> dict:
-        """감정/신체상태 키워드 처리"""
+        """✅ 감정/신체상태 키워드 처리 (통합 버전)"""
 
-        # 피로/졸음 → 카페/휴식
-        tired_words = ["피곤", "졸려", "지쳐", "힘들", "녹초"]
-        if any(w in text for w in tired_words):
-            if not q.get("category"):
-                q["category"] = "카페"
-            q["vibe"] = "여유로운"
-            q["confidence"] = max(float(q.get("confidence", 0) or 0), 0.7)
-            logger.info("[POST_FIX] 피로 감지 → category=카페")
+        # 이미 category가 확실하면 스킵 (GPT가 잘 파싱한 경우)
+        current_conf = float(q.get("confidence", 0) or 0)
 
-        # 분노/스트레스 → 스포츠
-        angry_words = ["열받", "화나", "짜증", "스트레스", "빡쳐"]
-        if any(w in text for w in angry_words):
-            q["category"] = "스포츠"
-            q["vibe"] = "격렬한"
-            q["confidence"] = max(float(q.get("confidence", 0) or 0), 0.75)
-            logger.info("[POST_FIX] 분노 감지 → category=스포츠")
+        # ✅ 감정 키워드는 confidence가 높아도 우선!
+        # if q.get("category") and current_conf >= 0.8:  # ← 이 조건 제거 또는 완화
+        #     return q
 
-        # 외로움/우울 → 소셜
-        lonely_words = ["외로", "심심", "우울", "쓸쓸"]
-        if any(w in text for w in lonely_words):
-            q["category"] = "소셜"
-            q["vibe"] = "즐거운"
-            q["confidence"] = max(float(q.get("confidence", 0) or 0), 0.7)
-            logger.info("[POST_FIX] 외로움 감지 → category=소셜")
+        # 감정 매핑 우선 체크
+        for emotion_type, mapping in self.EMOTION_MAPPINGS.items():
+            keywords = mapping["keywords"]
 
-        # 온도 → 실내/야외
-        if "추워" in text or "춥" in text:
-            q["location_type"] = "INDOOR"
-            q["confidence"] = max(float(q.get("confidence", 0) or 0), 0.65)
-        if "더워" in text or "덥" in text:
-            q["location_type"] = "OUTDOOR"
-            q["confidence"] = max(float(q.get("confidence", 0) or 0), 0.65)
+            if any(kw in text for kw in keywords):
+                # category 처리 (✅ 항상 덮어쓰기)
+                if mapping["category"]:
+                    q["category"] = mapping["category"]
+                    logger.info(f"[POST_FIX] {mapping['message']} → category={mapping['category']}")
+
+                # vibe 처리 (항상 적용)
+                if mapping["vibe"]:
+                    q["vibe"] = mapping["vibe"]
+                    q["emotion_vibe_locked"] = True
+                    logger.info(f"[POST_FIX] {mapping['message']} → vibe={mapping['vibe']}")
+
+                # confidence 상향
+                q["confidence"] = max(current_conf, mapping["confidence"])
+
+                # 특수 처리
+                if emotion_type == "hungry":
+                    q.pop("subcategory", None)
+
+                # 첫 매칭에서 종료
+                return q
 
         return q
 
