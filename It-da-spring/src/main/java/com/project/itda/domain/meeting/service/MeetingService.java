@@ -48,12 +48,9 @@ public class MeetingService {
 
     private final MeetingRepository meetingRepository;
     private final ParticipationRepository participationRepository;
-<<<<<<< HEAD
     private final ChatRoomRepository chatRoomRepository;
     private final ChatParticipantRepository chatParticipantRepository;
-=======
     private final PushNotificationService pushNotificationService;  // ✅ [NEW] 추가됨!
->>>>>>> origin/보보
 
     private final String uploadDir = "uploads/meetings/";
 
@@ -64,7 +61,6 @@ public class MeetingService {
     public MeetingResponse createMeeting(User user, MeetingCreateRequest request) {
         log.info("📍 POST /api/meetings - userId: {}", user.getUserId());
 
-<<<<<<< HEAD
         ChatRoom chatRoom = ChatRoom.builder()
                 .roomName(request.getTitle())
                 .maxParticipants(request.getMaxParticipants())
@@ -74,8 +70,6 @@ public class MeetingService {
         chatRoomRepository.save(chatRoom);
 
         // 시간대 자동 설정
-=======
->>>>>>> origin/보보
         MeetingTimeSlot timeSlot = MeetingTimeSlot.fromHour(request.getMeetingTime().getHour());
 
         Meeting.LocationType locationType = Meeting.LocationType.valueOf(
@@ -108,7 +102,6 @@ public class MeetingService {
 
         Meeting savedMeeting = meetingRepository.save(meeting);
 
-<<<<<<< HEAD
         ChatParticipant chatOrganizer = ChatParticipant.builder()
                 .chatRoom(chatRoom)
                 .user(user)
@@ -119,9 +112,6 @@ public class MeetingService {
         chatParticipantRepository.save(chatOrganizer);
 
         Participation participation = Participation.builder()
-=======
-        Participation organizerParticipation = Participation.builder()
->>>>>>> origin/보보
                 .user(user)
                 .meeting(savedMeeting)
                 .status(ParticipationStatus.APPROVED)
