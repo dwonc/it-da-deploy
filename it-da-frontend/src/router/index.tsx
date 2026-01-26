@@ -10,7 +10,6 @@ import ProtectedRoute from "./ProtectedRoute";
 import PublicRoute from "./PublicRoute";
 import OAuth2CallbackPage from "@/pages/auth/OAuth2CallbackPage";
 import ChatRoomPage from "@/pages/chat/ChatRoomPage";
-import TestChatPage from "@/pages/chat/TestChatPage";
 import UserChatListPage from "@/pages/mypage/components/UserChatListPage";
 import UserChatRoomPage from "@/pages/mypage/components/UserChatRoomPage";
 import MeetingCreatePage from "@/pages/meeting/MeetingCreatePage";
@@ -44,7 +43,166 @@ import MyBadgesPage from "@/pages/mypage/MyBadgesPage";
 import BadgeCatalogPage from "@/pages/badge/BadgeCatalogPage";
 
 export const router = createBrowserRouter(
+<<<<<<< HEAD
   [
+=======
+    [
+        {
+            path: "/",
+            element: (
+                <PreferenceGuard>
+                    <HomePage />
+                </PreferenceGuard>
+            ),
+        },
+        {
+            path: "/user-preference/setup",
+            element: (
+                <ProtectedRoute>
+                    <UserPreferenceSetupPage />
+                </ProtectedRoute>
+            ),
+        },
+        {
+            path: "/login",
+            element: (
+                <PublicRoute>
+                    <LoginPage />
+                </PublicRoute>
+            ),
+        },
+        {
+            path: "/category",
+            element: <CategoryListPage />,
+        },
+        {
+            path: "/category/:category",
+            element: <CategoryDetailPage />,
+        },
+        {
+            path: "/meetings",
+            element: <MeetingListPage />,
+        },
+        // {
+        //     path: "/meeting/:id",
+        //     element: <MeetingDetailPage />,
+        // },
+        {
+            path: "/signup",
+            element: (
+                <PublicRoute>
+                    <SignupPage />
+                </PublicRoute>
+            ),
+        },
+        {
+            path: "/ai-matching",
+            element: (
+                <PreferenceGuard>
+                    <ProtectedRoute>
+                        <AIMatchingPage />
+                    </ProtectedRoute>
+                </PreferenceGuard>
+            ),
+        },
+        {
+            path: "/my-meetings",
+            element: (
+                <ProtectedRoute>
+                    <MyMeetingsListPage />
+                </ProtectedRoute>
+            ),
+        },
+        {
+            path: "/mypage",
+            element: <MyPage />,
+        },
+        {
+            path: "/profile",
+            element: <MyPage />,
+        },
+        {
+            path: "/profile/edit",
+            element: <ProfileEditPage />,
+        },
+        {
+            path: "/profile/id/:userId",
+            element: <UserProfileById />,
+        },
+        {
+            path: "/:emailPrefix",
+            element: <UserProfile />,
+        },
+        {
+            path: "/auth/callback",
+            element: <OAuth2CallbackPage />,
+        },
+        {
+            path: "/auth/callBack",
+            element: <OAuth2CallbackPage />,
+        },
+        {
+            path: "/chat/:roomId",
+            element: (
+                <ProtectedRoute>
+                    <ChatRoomPage />
+                </ProtectedRoute>
+            ),
+        },
+        {
+            path: "/social/chat/success", // CreateChatRoom에서 이동하는 경로와 일치
+            element: (
+                <ProtectedRoute>
+                    <ChatRoomSuccess />
+                </ProtectedRoute>
+            ),
+        },
+        {
+          path:"/social/rooms",
+          element: <ChatRoomListPage />
+        },
+        {
+            path: "/meetings/create",
+            element: (
+                <ProtectedRoute>
+                    <MeetingCreatePage />
+                </ProtectedRoute>
+            ),
+        },
+        {
+            path: "/meetings/:meetingId",
+            element: <MeetingDetailPage />,
+        },
+        {
+            path: "/meetings/:meetingId/chat-preview",
+            element: <ChatPreviewPage />,
+        },
+        {
+            path: "/meetings/:meetingId/manage",
+            element: <MeetingManagePage />,
+        },
+        {
+            path: "/meetings/:meetingId/edit",
+            element: <MeetingEditPage />,
+        },
+        {
+            path: "/user-chat",
+            element: (
+                <ProtectedRoute>
+                    <UserChatListPage />
+                </ProtectedRoute>
+            ),
+        },
+        {
+            path: "/user-chat/:roomId",
+            element: (
+                <ProtectedRoute>
+                    <UserChatRoomPage />
+                </ProtectedRoute>
+            ),
+        },
+    ],
+>>>>>>> origin/의진5
     {
       path: "/",
       element: (
