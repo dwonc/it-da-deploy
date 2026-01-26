@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class MeetingManageResponse {
     private Long meetingId;
+    private Long chatRoomId;
     private String title;
     private String categoryName;
     private String subcategoryName;
@@ -33,6 +34,7 @@ public class MeetingManageResponse {
     public static MeetingManageResponse from(Meeting meeting) {
         return MeetingManageResponse.builder()
                 .meetingId(meeting.getMeetingId())
+                .chatRoomId(meeting.getChatRoom().getId())
                 .title(meeting.getTitle())
                 .categoryName(meeting.getCategory())
                 .subcategoryName(meeting.getSubcategory())

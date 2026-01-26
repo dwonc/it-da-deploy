@@ -673,7 +673,7 @@ const MyPage: React.FC = () => {
                   upcoming={upcomingMeetings}
                   completed={completedMeetings}
                   organized={organizedMeetings}
-                  onOpenChat={(id) => navigate(`/chat/${id}`)}
+                  onOpenChat={(chatRoomId) => navigate(`/chat/${chatRoomId}`)}
                   onOpenReview={handleOpenMeetingReviews}
                   onManageMeeting={handleManageMeeting}
                 />

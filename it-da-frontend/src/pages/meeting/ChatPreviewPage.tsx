@@ -6,6 +6,7 @@ import "./ChatPreviewPage.css";
 
 interface MeetingInfo {
   meetingId: number;
+  chatRoomId: number;
   title: string;
   organizerUsername: string;
   meetingTime: string;
@@ -29,7 +30,7 @@ const ChatPreviewPage = () => {
     try {
       const response = await axios.get(
         `http://localhost:8080/api/meetings/${meetingId}`,
-        { withCredentials: true }
+        { withCredentials: true },
       );
       setMeeting(response.data);
     } catch (err) {
@@ -40,7 +41,7 @@ const ChatPreviewPage = () => {
   };
 
   const handleEnterChat = () => {
-    navigate(`/chat/${meetingId}`);
+    navigate(`/chat/${meeting?.chatRoomId}`);
   };
 
   const handleGoBack = () => {

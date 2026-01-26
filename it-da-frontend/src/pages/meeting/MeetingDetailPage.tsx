@@ -8,6 +8,7 @@ import ChatPreviewModal from "./ChatPreviewModal";
 
 interface MeetingDetail {
   meetingId: number;
+  chatRoomId: number;
   organizerId: number;
   organizerUsername: string;
   organizerProfileImage: string;
@@ -97,6 +98,7 @@ const MeetingDetailPage = () => {
       const newItem = {
         id: meetingData.meetingId,
         meetingId: meetingData.meetingId,
+        chatRoomId: meetingData.chatRoomId,
         title: meetingData.title,
         category: meetingData.category,
         imageUrl: meetingData.imageUrl,
@@ -485,7 +487,7 @@ const MeetingDetailPage = () => {
 
   const handleChatPreview = () => {
     if (isParticipating && participationStatus === "APPROVED") {
-      navigate(`/chat/${meetingId}`);
+      navigate(`/chat/${meeting?.chatRoomId}`);
     } else {
       alert("참여 승인 후 톡방에 입장할 수 있습니다.");
     }
@@ -819,7 +821,7 @@ const MeetingDetailPage = () => {
           <>
             <button
               className="btn btn-secondary"
-              onClick={() => navigate(`/chat/${meetingId}`)}
+              onClick={() => navigate(`/chat/${meeting?.chatRoomId}`)}
             >
               💬 톡방 입장
             </button>
@@ -860,7 +862,7 @@ const MeetingDetailPage = () => {
         participationStatus={participationStatus}
         onEnterChat={() => {
           setIsPreviewModalOpen(false);
-          navigate(`/chat/${meetingId}`);
+          navigate(`/chat/${meeting?.chatRoomId}`);
         }}
       />
     </div>

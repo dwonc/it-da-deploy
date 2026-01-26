@@ -122,7 +122,7 @@ const MyMeetingsPage: React.FC<Props> = ({
                       <button
                         className="card-btn"
                         onClick={(e) =>
-                          handleButtonClick(e, () => onOpenChat?.(m.meetingId))
+                          handleButtonClick(e, () => onOpenChat?.(m.chatRoomId))
                         }
                       >
                         톡방
@@ -177,7 +177,7 @@ const MyMeetingsPage: React.FC<Props> = ({
                       <button
                         className="card-btn"
                         onClick={(e) =>
-                          handleButtonClick(e, () => onOpenChat?.(m.meetingId))
+                          handleButtonClick(e, () => onOpenChat?.(m.chatRoomId))
                         }
                       >
                         톡방

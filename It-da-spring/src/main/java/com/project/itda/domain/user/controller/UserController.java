@@ -90,6 +90,7 @@ public class UserController {
                     Map<String, Object> map = new HashMap<>();
                     map.put("meetingId", m.getMeetingId());
                     map.put("meetingTitle", m.getTitle());
+                    map.put("chatRoomId", m.getChatRoom().getId());
                     map.put("dateTime", m.getMeetingTime());
                     map.put("location", m.getLocationName() != null ? m.getLocationName() : m.getLocationAddress());
                     map.put("statusText", m.getStatus() != null ? m.getStatus().name() : "RECRUITING");

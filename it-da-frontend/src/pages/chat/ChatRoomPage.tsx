@@ -87,14 +87,49 @@ const ChatRoomPage: React.FC = () => {
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
   // AI 추천 알림창 (HTML 기능 반영)
-  const showAIRecommendation = () => {
-    toast(
-      "🤖 AI가 최적의 장소를 추천해드립니다!\n\n1. 여의도 한강공원 ⭐\n2. 반포 달빛광장\n3. 뚝섬 장미광장",
-      {
-        duration: 4000,
+  const showAIRecommendation = async () => {
+    try {
+      toast.loading("🤖 AI가 최적의 장소를 분석하고 있습니다...", {
+        id: "ai-loading",
+      });
+
+      // ✅ chatRoomId로 전송
+      const response = await api.post("/ai/recommendations/recommend-place", {
+        chatRoomId: Number(roomId), // roomId가 채팅방 ID
+      });
+
+      toast.dismiss("ai-loading");
+
+      if (!response.data.success || !response.data.recommendations?.length) {
+        toast.error(response.data.message || "추천 가능한 장소가 없습니다.");
+        return;
+      }
+
+      const places = response.data.recommendations;
+
+      const message =
+        `🤖 AI가 최적의 장소를 추천해드립니다!\n\n` +
+        `📍 중간 지점: ${response.data.centroid?.address || "계산 완료"}\n\n` +
+        places
+          .map(
+            (p: any, idx: number) =>
+              `${idx + 1}. ${p.placeName} ⭐\n` +
+              `   📍 ${p.address}\n` +
+              `   🚶 중간지점에서 ${p.distanceKm?.toFixed(1) || 0}km\n` +
+              `   💡 ${p.matchReasons?.join(", ") || "접근성이 좋아요"}`,
+          )
+          .join("\n\n");
+
+      toast(message, {
+        duration: 8000,
         icon: "🤖",
-      },
-    );
+      });
+    } catch (error: any) {
+      console.error("AI 추천 실패:", error);
+      toast.error(
+        error.response?.data?.message || "장소 추천을 불러올 수 없습니다",
+      );
+    }
   };
 
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {

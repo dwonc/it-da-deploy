@@ -11,6 +11,160 @@
   padding: 2rem;
 }
 
+/* ========================================
+   ✅ AI 추천 카드 개선 (가로폭 확대 + 이미지 잘림 해결)
+   ======================================== */
+
+/* AI 추천 래퍼 - 더 넓게 */
+.ai-recommend-section {
+  margin: 2.5rem 0;
+  max-width: 100%; /* 부모 너비 최대 활용 */
+}
+
+/* AI 카드 컨테이너 */
+.ai-recommend-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 8px 30px rgba(102, 126, 234, 0.3);
+  transition: all 0.3s ease;
+  max-width: 1200px; /* 기존보다 넓게 */
+  margin: 0 auto;
+}
+
+.ai-recommend-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(102, 126, 234, 0.4);
+}
+
+/* 이미지 컨테이너 - 높이 증가 & 잘림 방지 */
+.ai-card-image-container {
+  width: 100%;
+  height: 380px; /* 높이 대폭 증가 */
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #e9ecef 0%, #f8f9fa 100%);
+}
+
+.ai-card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* ✅ 잘림 없이 컨테이너 채우기 */
+  object-position: center; /* 중앙 정렬 */
+  transition: transform 0.5s ease;
+}
+
+/* 호버 시 살짝 확대 효과 */
+.ai-recommend-card:hover .ai-card-image {
+  transform: scale(1.05);
+}
+
+/* AI 매칭률 뱃지 */
+.ai-match-badge {
+  position: absolute;
+  top: 1.5rem;
+  left: 1.5rem;
+  background: rgba(255, 255, 255, 0.95);
+  color: #667eea;
+  padding: 0.8rem 1.5rem;
+  border-radius: 30px;
+  font-size: 1rem;
+  font-weight: 700;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  animation: pulse-badge 2s infinite;
+  z-index: 10;
+}
+
+@keyframes pulse-badge {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* AI 카드 하단 정보 영역 */
+.ai-card-content {
+  padding: 2rem;
+  color: white;
+}
+
+.ai-card-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  margin-bottom: 0.8rem;
+  color: white;
+}
+
+.ai-card-description {
+  font-size: 1rem;
+  line-height: 1.6;
+  opacity: 0.95;
+  margin-bottom: 1.5rem;
+}
+
+.ai-card-tags {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.ai-card-tag {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 0.4rem 0.8rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: white;
+}
+
+.ai-card-actions {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.ai-card-btn {
+  padding: 0.8rem 1.5rem;
+  border-radius: 30px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+.ai-card-btn-primary {
+  background: white;
+  color: #667eea;
+  border-color: white;
+}
+
+.ai-card-btn-primary:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.ai-card-btn-secondary {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.ai-card-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.6);
+}
+
+/* ======================================== */
+
 /* 섹션 공통 스타일 */
 .meeting-section,
 .category-section {
@@ -148,6 +302,11 @@
   .main-container {
     padding: 1.5rem;
   }
+
+  .ai-card-image-container {
+    height: 320px; /* 모바일에서도 충분한 높이 */
+  }
+
   .chatroom-grid {
     grid-template-columns: repeat(2, 1fr); /* 2열로 축소 */
   }
@@ -166,6 +325,18 @@
     font-size: 0.9rem;
   }
 
+  .ai-card-image-container {
+    height: 250px;
+  }
+
+  .ai-card-title {
+    font-size: 1.4rem;
+  }
+
+  .ai-card-actions {
+    flex-direction: column;
+  }
+
   .chatroom-grid {
     grid-template-columns: 1fr; /* 1열로 축소 */
   }
@@ -176,6 +347,15 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
+  }
+
+  .ai-card-image-container {
+    height: 200px;
+  }
+
+  .ai-match-badge {
+    padding: 0.6rem 1rem;
+    font-size: 0.85rem;
   }
 }
 
@@ -221,11 +401,7 @@
     padding: 14px 24px;
   }
 }
-.section-header {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.5rem;
-}
+
 /* ========== 최근 참여 모임 없을 때 스타일 ========== */
 .empty-recent-section {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);

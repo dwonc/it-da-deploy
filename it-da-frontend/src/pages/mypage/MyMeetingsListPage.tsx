@@ -244,7 +244,7 @@ const MyMeetingsListPage: React.FC = () => {
                               className="card-btn"
                               onClick={(e) =>
                                 handleButtonClick(e, () =>
-                                  navigate(`/chat/${m.meetingId}`),
+                                  navigate(`/chat/${m.chatRoomId}`),
                                 )
                               }
                             >
@@ -254,7 +254,7 @@ const MyMeetingsListPage: React.FC = () => {
                               className="card-btn primary"
                               onClick={(e) =>
                                 handleButtonClick(e, () =>
-                                  handleManageMeeting(m.meetingId),
+                                  handleManageMeeting(m.chatRoomId),
                                 )
                               }
                             >
@@ -303,7 +303,7 @@ const MyMeetingsListPage: React.FC = () => {
                               className="card-btn"
                               onClick={(e) =>
                                 handleButtonClick(e, () =>
-                                  navigate(`/chat/${m.meetingId}`),
+                                  navigate(`/chat/${m.chatRoomId}`),
                                 )
                               }
                             >
