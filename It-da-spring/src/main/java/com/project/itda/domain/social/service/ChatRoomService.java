@@ -253,14 +253,21 @@ public class ChatRoomService {
         return Math.max(0, (int)(totalParticipants - onlineCount));
     }
     @Transactional
-    public void updateNotice(Long roomId, String notice) {
+    public void updateNotice(Long roomId, String notice, String userEmail) {
+        ChatParticipant participant = chatParticipantRepository.findByChatRoomIdAndUserEmail(roomId, userEmail)
+                .orElseThrow(() -> new IllegalArgumentException("채팅방 참여자가 아닙니다."));
+
+        // 2. 권한 확인 (방장인지 체크)
+        if (participant.getRole() != ChatRole.ORGANIZER) {
+            throw new IllegalStateException("공지사항 수정 권한이 없습니다. 방장만 가능합니다.");
+        }
+
+        // 3. 채팅방 조회 및 업데이트
         ChatRoom room = chatRoomRepository.findById(roomId)
                 .orElseThrow(() -> new IllegalArgumentException("채팅방을 찾을 수 없습니다."));
 
         room.updateNotice(notice);
-
-        // (선택사항) 여기서 "공지가 등록되었습니다"라는 시스템 메시지를 보내거나
-        // 소켓으로 실시간 업데이트 신호를 보낼 수도 있습니다.
+        log.info("✅ 방장에 의해 공지사항 업데이트 완료: roomId={}", roomId);
     }
     public List<ChatParticipantResponse> searchUsers(String keyword,Long currentUserId) {
         List<User> users;

@@ -17,6 +17,26 @@ const ChatMessage: React.FC<Props> = ({ message, isMine }) => {
     const { user: currentUser } = useAuthStore();
     const [isModalOpen, setIsModalOpen] = useState(false);
 
+    const handleDownload = async (e: React.MouseEvent, imageUrl: string) => {
+        e.stopPropagation(); // 부모 클릭 이벤트(확대 모달) 방지
+        try {
+            const response = await fetch(imageUrl);
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            // 파일명 생성 (예: chat_image_12345.png)
+            link.download = `chat_image_${message.messageId}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            toast.success("이미지가 저장되었습니다.");
+        } catch (error) {
+            console.error("이미지 다운로드 실패:", error);
+            toast.error("다운로드에 실패했습니다.");
+        }
+    };
     // 1. metadata 파싱 (새로고침 시 문자열 대응)
     const parsedData = React.useMemo(() => {
         try {
@@ -139,28 +159,79 @@ const ChatMessage: React.FC<Props> = ({ message, isMine }) => {
 
         // 3. IMAGE 타입
         if (message.type === 'IMAGE') {
+            const imageUrl = `http://localhost:8080${message.content}`;
+            // 백엔드 FileController 수정이 되어있어야 ?download=true가 작동합니다.
+            const downloadUrl = `${imageUrl}?download=true`;
+
             return (
-                <>
+                <div style={{ position: 'relative', display: 'inline-block', borderRadius: '12px', overflow: 'hidden' }}>
+                    {/* 이미지 (클릭 시 확대 모달) */}
                     <img
-                        src={`http://localhost:8080${message.content}`}
+                        src={imageUrl}
                         alt="uploaded"
                         className="chat-img"
-                        onClick={() => setIsModalOpen(true)} // ✅ 클릭 시 모달 열기
-                        style={{ cursor: 'zoom-in' }}
+                        onClick={() => setIsModalOpen(true)}
+                        style={{ cursor: 'zoom-in', display: 'block', maxWidth: '100%', height: 'auto' }}
                     />
 
-                    {/* ✅ 사진 확대 모달 포탈/컴포넌트 대체용 단순 구조 */}
+                    {/* 🎨 심플한 다운로드 버튼 (SVG 아이콘) */}
+                    <a
+                        href={downloadUrl}
+                        download
+                        onClick={(e) => e.stopPropagation()} // 이미지 확대 방지
+                        title="저장하기"
+                        style={{
+                            position: 'absolute',
+                            bottom: '10px',
+                            right: '10px',
+                            width: '36px',
+                            height: '36px',
+                            borderRadius: '50%',
+                            backgroundColor: 'rgba(0, 0, 0, 0.4)', // 반투명 검정 배경 (세련됨)
+                            backdropFilter: 'blur(4px)', // 배경 흐림 효과 (고급짐)
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#fff',
+                            border: '1px solid rgba(255, 255, 255, 0.2)', // 은은한 테두리
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease',
+                            textDecoration: 'none',
+                            zIndex: 10
+                        }}
+                        // 마우스 올렸을 때 조금 더 진해지게 처리
+                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.7)'}
+                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'rgba(0, 0, 0, 0.4)'}
+                    >
+                        {/* 깔끔한 다운로드 화살표 아이콘 (SVG) */}
+                        <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        >
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="7 10 12 15 17 10" />
+                            <line x1="12" y1="15" x2="12" y2="3" />
+                        </svg>
+                    </a>
+
+                    {/* 확대 모달 */}
                     {isModalOpen && (
                         <div className="image-full-modal" onClick={() => setIsModalOpen(false)}>
                             <div className="modal-overlay"></div>
-                            <img src={`http://localhost:8080${message.content}`} alt="full" className="full-image-content" onClick={(e) => e.stopPropagation()} />
+                            <img src={imageUrl} alt="full" className="full-image-content" onClick={(e) => e.stopPropagation()} />
                             <span className="close-x" onClick={() => setIsModalOpen(false)}>×</span>
                         </div>
                     )}
-                </>
+                </div>
             );
         }
-        // 4. 일반 텍스트: 위의 특수 타입들에 해당하지 않는 경우에만 실행됨
+
         return <p className="chat-text">{message.content}</p>;
     };
 

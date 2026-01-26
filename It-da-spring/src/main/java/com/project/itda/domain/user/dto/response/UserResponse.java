@@ -24,7 +24,7 @@ public class UserResponse {
                 .phone(user.getPhone())
                 .profileImageUrl(user.getProfileImageUrl())
                 .bio(user.getBio())
-                .gender(user.getGender())
+                .gender(user.getGender() != null ? user.getGender().name() : null)
                 .address(user.getAddress())
                 .build();
     }

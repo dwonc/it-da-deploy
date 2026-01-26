@@ -87,8 +87,13 @@ public class ChatRoomController {
             @PathVariable Long roomId,
             @RequestBody Map<String, String> request
     ) {
+        SessionUser user = (SessionUser) httpSession.getAttribute("user");
+        if (user == null) return ResponseEntity.status(401).build();
+
         String notice = request.get("notice");
-        chatRoomService.updateNotice(roomId, notice);
+        // 서비스 호출 시 세션 유저의 이메일을 전달하여 권한 검증
+        chatRoomService.updateNotice(roomId, notice, user.getEmail());
+
         return ResponseEntity.ok().build();
     }
     @GetMapping("/users/search")
