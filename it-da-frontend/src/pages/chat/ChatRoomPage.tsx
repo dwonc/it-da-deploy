@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useChatStore, type ChatMessage } from "@/stores/useChatStore.ts";
-import { chatApi } from "@/api/chat.api.ts"; // ChatMessage 타입 활용
+import { chatApi } from "@/api/chat.api.ts";
 import ChatMessageItem from "../../components/chat/ChatMessage";
 import ChatMemberList from "../../components/chat/ChatMemberList";
 import { useAuthStore } from "@/stores/useAuthStore";
@@ -14,9 +14,10 @@ import PollInputModal from "../../components/chat/PollInputModal";
 import api from "@/api/axios.config";
 import InviteMemberModal from "@/components/chat/InviteMemberModal.tsx";
 
+// ... (Interface 정의는 동일하게 유지)
 interface BillData {
   totalAmount: number;
-  participantCount: number; // 참여 인원 추가
+  participantCount: number;
   account: string;
 }
 
@@ -40,14 +41,6 @@ interface RawMemberResponse {
   isFollowing: boolean;
 }
 
-// const api = axios.create({
-//     baseURL: 'http://localhost:8080',
-//     withCredentials: true,
-//     headers: {
-//         'Content-Type': 'application/json'
-//     }
-// });
-
 const ChatRoomPage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const {
@@ -57,10 +50,16 @@ const ChatRoomPage: React.FC = () => {
     markAllAsRead,
     decrementUnreadCount,
   } = useChatStore();
+  const [members, setMembers] = useState<User[]>([]);
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const { user: currentUser } = useAuthStore();
-
-  const [members, setMembers] = useState<User[]>([]);
+  const currentUserMemberInfo = useMemo(
+    () => members.find((m) => m.userId === currentUser?.userId),
+    [members, currentUser],
+  );
+  // 백엔드에서 ORGANIZER로 내려주는 값을 프론트에서 LEADER로 매핑 중이므로 아래와 같이 설정합니다.
+  const isLeader = currentUserMemberInfo?.role === "LEADER";
+  const isOrganizer = isLeader; // 방장에게 공지 권한 부여
   const [reportTarget, setReportTarget] = useState<{
     id: number;
     name: string;
@@ -81,22 +80,19 @@ const ChatRoomPage: React.FC = () => {
   const [inputValue, setInputValue] = useState<string>("");
   const navigate = useNavigate();
   const [linkedMeetingId, setLinkedMeetingId] = useState<number | null>(null);
-  // ✨ [추가] 현재 사용자가 모임장인지 확인
-  const isLeader =
-    members.find((m) => m.userId === currentUser?.userId)?.role === "LEADER";
+
   const [notice, setNotice] = useState<string>("");
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
 
-  // AI 추천 알림창 (HTML 기능 반영)
+  // 1️⃣ [수정됨] showAIRecommendation 함수를 return 문 밖(컴포넌트 로직 부분)으로 이동
   const showAIRecommendation = async () => {
     try {
       toast.loading("🤖 AI가 최적의 장소를 분석하고 있습니다...", {
         id: "ai-loading",
       });
 
-      // ✅ chatRoomId로 전송
       const response = await api.post("/ai/recommendations/recommend-place", {
-        chatRoomId: Number(roomId), // roomId가 채팅방 ID
+        chatRoomId: Number(roomId),
       });
 
       toast.dismiss("ai-loading");
@@ -121,6 +117,16 @@ const ChatRoomPage: React.FC = () => {
           )
           .join("\n\n");
 
+      // 단순히 Toast만 띄우는 것이 아니라 채팅방에 메시지로 쏘고 싶다면 아래 주석 해제
+      chatApi.sendMessage(
+        Number(roomId),
+        currentUser!.email,
+        currentUser!.userId,
+        message,
+        "TALK",
+        {},
+      );
+
       toast(message, {
         duration: 8000,
         icon: "🤖",
@@ -130,6 +136,7 @@ const ChatRoomPage: React.FC = () => {
       toast.error(
         error.response?.data?.message || "장소 추천을 불러올 수 없습니다",
       );
+      toast.dismiss("ai-loading");
     }
   };
 
@@ -139,7 +146,6 @@ const ChatRoomPage: React.FC = () => {
 
     try {
       setIsLoading(true);
-      // API 호출하여 서버 저장 및 채팅 메시지 발송 (백엔드에서 자동 처리)
       await chatApi.uploadImage(Number(roomId), file);
       toast.success("이미지를 전송했습니다.");
     } catch (error) {
@@ -147,11 +153,10 @@ const ChatRoomPage: React.FC = () => {
       toast.error("이미지 전송에 실패했습니다.");
     } finally {
       setIsLoading(false);
-      if (fileInputRef.current) fileInputRef.current.value = ""; // 입력창 초기화
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  // ✅ 스크롤 핸들러 구현 (위로 올리면 과거 기록 로드)
   const handleScroll = async () => {
     if (!chatContainerRef.current || !hasMore || isLoading) return;
 
@@ -177,8 +182,6 @@ const ChatRoomPage: React.FC = () => {
           }));
 
           const combined = [...validatedOldMessages, ...messages];
-
-          // 중복 제거 강화
           const uniqueMap = new Map();
           combined.forEach((msg) => {
             if (!uniqueMap.has(msg.messageId)) {
@@ -222,7 +225,6 @@ const ChatRoomPage: React.FC = () => {
         const perPerson = Math.floor(data.totalAmount / data.participantCount);
         const updatedParticipants = data.participants.map((p: any) => ({
           ...p,
-          // 참여자 ID와 현재 로그인 유저 ID 비교 (타입 일치를 위해 Number 사용)
           isPaid: Number(p.userId) === Number(currentUser?.userId),
         }));
         const content = `💰 정산 요청: 1인당 ${perPerson.toLocaleString()}원`;
@@ -241,14 +243,13 @@ const ChatRoomPage: React.FC = () => {
           metadata,
         );
       } else if (type === "POLL") {
-        // ✅ 투표는 별도 API로 생성 (백엔드의 VoteController 사용)
         await api.post(
           `/votes/${roomId}`,
           {
             title: data.title,
             isAnonymous: data.isAnonymous || false,
             isMultipleChoice: data.isMultipleChoice || false,
-            options: data.options, // 문자열 배열로 전송
+            options: data.options,
           },
           { withCredentials: true },
         );
@@ -266,12 +267,9 @@ const ChatRoomPage: React.FC = () => {
   useEffect(() => {
     const initChat = async () => {
       if (!roomId || !currentUser) return;
-
-      // 🚀 디버깅: 현재 진입한 ID가 모임 ID인지 채팅방 ID인지 확인
       console.log("🔍 [ChatRoom] Initializing with RoomID:", roomId);
 
       try {
-        // 1. 초기 메시지 로드 (독립적)
         try {
           const history = await chatApi.getChatMessages(Number(roomId), 0, 50);
           const validatedHistory: ChatMessage[] = (history as any[]).map(
@@ -281,7 +279,6 @@ const ChatRoomPage: React.FC = () => {
               content: msg.content || "",
               unreadCount: Number(msg.unreadCount ?? 0),
               sentAt: msg.sentAt || new Date().toISOString(),
-              // 만약 msg.type이 string이라 에러가 난다면 아래와 같이 단언
               type: msg.type as ChatMessage["type"],
               metadata: msg.metadata || null,
             }),
@@ -291,33 +288,23 @@ const ChatRoomPage: React.FC = () => {
           console.error("❌ 메시지 로드 실패:", e);
         }
 
-        // 2. 읽음 처리 (실패해도 무방하므로 catch 처리)
         try {
           await chatApi.markAsRead(Number(roomId), currentUser.email);
-          // chatApi.sendReadEvent(Number(roomId), currentUser.email);
           markAllAsRead();
         } catch (e) {
           console.warn("⚠️ 읽음 처리 실패 (API 확인 필요):", e);
         }
 
-        // 3. 방 제목 설정
         try {
           const rooms = await chatApi.getRooms();
-          console.log("🔍 채팅방 목록 로드:", rooms);
           const currentRoom = rooms.find(
             (r: any) => r.chatRoomId === Number(roomId),
           );
           if (currentRoom) {
             setRoomTitle(currentRoom.roomName);
-
-            // ✨ [핵심] 백엔드에서 meetingId를 보내준다고 가정
             if (currentRoom.meetingId) {
               setLinkedMeetingId(currentRoom.meetingId);
               console.log("🔗 연결된 모임 ID:", currentRoom.meetingId);
-            } else {
-              console.warn(
-                "⚠️ 채팅방 정보에 meetingId가 없습니다. 백엔드 DTO를 확인해주세요.",
-              );
             }
             if (currentRoom.notice) {
               setNotice(currentRoom.notice);
@@ -327,7 +314,6 @@ const ChatRoomPage: React.FC = () => {
           console.warn("⚠️ 방 제목 로드 실패");
         }
 
-        // 4. 멤버 목록 로드 (500 에러 발생 지점 방어)
         try {
           const rawMembers: RawMemberResponse[] = await chatApi.getRoomMembers(
             Number(roomId),
@@ -356,12 +342,8 @@ const ChatRoomPage: React.FC = () => {
             })),
           );
         } catch (e) {
-          console.error(
-            "❌ 멤버 로드 실패 (ID 101이 chat_rooms 테이블에 있나요?):",
-            e,
-          );
-          toast.error("멤버 정보를 불러올 수 없습니다.");
-          setMembers([]); // 에러 시 빈 배열로 초기화하여 렌더링 에러 방지
+          console.error("❌ 멤버 로드 실패:", e);
+          setMembers([]);
         }
       } catch (e) {
         console.error("🚨 예상치 못한 치명적 오류:", e);
@@ -373,7 +355,7 @@ const ChatRoomPage: React.FC = () => {
     let isSubscribed = true;
 
     if (roomId && currentUser?.email) {
-      chatApi.disconnect(); // 중복 구독 방지
+      chatApi.disconnect();
 
       chatApi.connect(
         Number(roomId),
@@ -387,20 +369,15 @@ const ChatRoomPage: React.FC = () => {
             );
             addMessage({
               ...newMsg,
-              messageId: targetId, // 원본 메시지 ID 고정
-              type: "BILL", // 타입을 BILL로 보내야 ChatMessage.tsx가 정산 UI를 유지함
-              // metadata는 서버에서 온 업데이트된 객체를 그대로 사용
+              messageId: targetId,
+              type: "BILL",
               metadata:
                 typeof newMsg.metadata === "string"
                   ? JSON.parse(newMsg.metadata)
                   : newMsg.metadata,
             });
-            return; // 업데이트용 신호이므로 아래의 중복 체크 로직을 타지 않게 종료
+            return;
           }
-
-          const isMine =
-            Number(newMsg.senderId) === Number(currentUser.userId) ||
-            newMsg.senderEmail === currentUser.email;
 
           const serverCount = Number(newMsg.unreadCount ?? 0);
 
@@ -418,26 +395,11 @@ const ChatRoomPage: React.FC = () => {
           };
 
           addMessage(validatedMsg);
-
-          // if (!isMine && (newMsg.type === 'TALK' || newMsg.type === 'IMAGE' || newMsg.type === 'BILL' || newMsg.type === 'POLL')) {
-          //     chatApi.sendReadEvent(Number(roomId), currentUser.email);
-          // }
-
-          console.log(
-            `📩 메시지 수신 -fif (currentUser && readData.email !== currentUser.email) 타입: ${isMine ? "발송" : "수신"}, unreadCount: ${serverCount}`,
-          );
         },
         (readData: any) => {
           console.log("📖 읽음 이벤트 수신:", readData);
-          // ✅ 핵심 수정 3: 상대방이 읽었을 때만 내 화면의 숫자를 줄임
-          // 내가 읽은 이벤트는 이미 markAllAsRead() 등으로 처리되므로 중복 차감 방지
           if (currentUser && readData.email !== currentUser.email) {
-            // 💡 추가 검증: 만약 특정 유저가 '이미' 방에 있었다면 중복 차감하지 않도록
-            // 백엔드에서 준 실시간 숫자가 0보다 클 때만 수행
-            console.log(`✅ 타인(${readData.email}) 읽음 확인: 숫자 1 차감`);
             decrementUnreadCount();
-          } else {
-            console.log("ℹ️ 본인 이벤트 혹은 중복 신호: 차감 무시");
           }
         },
       );
@@ -446,24 +408,21 @@ const ChatRoomPage: React.FC = () => {
       isSubscribed = false;
       chatApi.disconnect();
     };
-  }, [roomId, currentUser, setMessages, markAllAsRead, decrementUnreadCount]); // ✅ 의존성 배열 정리
+  }, [roomId, currentUser, setMessages, markAllAsRead, decrementUnreadCount]);
 
   const handleEditMeeting = () => {
     if (!linkedMeetingId) {
       toast.error("연결된 모임 정보를 찾을 수 없습니다.");
       return;
     }
-    // MeetingEditPage 경로로 이동
     navigate(`/meetings/${linkedMeetingId}/edit`);
   };
 
-  // ✨ [추가] 모임 상세보기 이동 핸들러
   const handleMeetingDetail = () => {
     if (!linkedMeetingId) {
       toast.error("연결된 모임 정보를 찾을 수 없습니다.");
       return;
     }
-    // MeetingDetailPage 경로로 이동
     navigate(`/meetings/${linkedMeetingId}`);
   };
 
@@ -495,7 +454,7 @@ const ChatRoomPage: React.FC = () => {
 
     switch (feature) {
       case "📷":
-        fileInputRef.current?.click(); // 숨겨진 파일 입력창 클릭 실행
+        fileInputRef.current?.click();
         break;
       case "📊":
         setActiveModal("POLL");
@@ -507,7 +466,7 @@ const ChatRoomPage: React.FC = () => {
         chatApi.sendMessage(
           Number(roomId),
           currentUser.email,
-          currentUser.userId, // ✅ 인자 추가됨
+          currentUser.userId,
           "📍 모임 장소 확인하세요.",
           "LOCATION",
           { placeName: "여의도 한강공원", lat: 37.5271, lng: 126.9328 },
@@ -521,13 +480,9 @@ const ChatRoomPage: React.FC = () => {
     try {
       await chatApi.followUser(targetUserId);
       toast.success("팔로우가 완료되었습니다!");
-
-      // ✅ [수정] 성공 시 화면 데이터를 즉시 업데이트 (새로고침 없이 반영)
-      setMembers((prevMembers) =>
-        prevMembers.map((member) =>
-          member.userId === targetUserId
-            ? { ...member, isFollowing: true } // 해당 유저의 팔로우 상태를 true로 변경
-            : member,
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.userId === targetUserId ? { ...m, isFollowing: true } : m,
         ),
       );
     } catch (error) {
@@ -545,7 +500,6 @@ const ChatRoomPage: React.FC = () => {
 
   const scrollToBottom = () => {
     if (page === 0) {
-      // ✅ 첫 페이지 로드나 새 메시지일 때만 아래로 스크롤
       messageEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   };
@@ -594,13 +548,18 @@ const ChatRoomPage: React.FC = () => {
       );
     });
   };
+
   const handleEditNotice = async () => {
+    if (!isOrganizer) {
+      toast.error("방장만 공지사항을 수정할 수 있습니다.");
+      return;
+    }
     const newNotice = prompt("새로운 공지사항을 입력하세요:", notice);
-    if (newNotice === null) return; // 취소 시
+    if (newNotice === null) return;
 
     try {
       await chatApi.updateNotice(Number(roomId), newNotice);
-      setNotice(newNotice); // 화면 즉시 반영
+      setNotice(newNotice);
       toast.success("공지사항이 등록되었습니다.");
     } catch (error) {
       console.error("공지 수정 실패:", error);
@@ -640,23 +599,50 @@ const ChatRoomPage: React.FC = () => {
         </div>
       )}
 
-      {/* ✅ AI 추천 배너 (그라데이션 디자인) */}
-      <div className="ai-banner" onClick={showAIRecommendation}>
-        <span style={{ fontSize: "2rem" }}>🤖</span>
-        <div className="ai-banner-content">
-          <div className="ai-banner-title">AI 장소 추천</div>
-          <div className="ai-banner-subtitle">
-            날씨와 분위기에 맞는 최적의 장소를 추천해드려요
-          </div>
+      {/* 2️⃣ [수정됨] 함수 호출을 위한 UI 배너 추가 (그라데이션 디자인) */}
+      <div
+        className="ai-recommendation-banner"
+        style={{
+          background: "linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)",
+          padding: "12px 16px",
+          margin: "10px 10px 0 10px",
+          borderRadius: "12px",
+          color: "white",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <span style={{ fontSize: "1.2rem" }}>🤖</span>
+          <span style={{ fontSize: "0.9rem", fontWeight: 600 }}>
+            어디서 만날지 고민되시나요?
+          </span>
         </div>
-        <span>→</span>
+        <button
+          onClick={showAIRecommendation}
+          style={{
+            backgroundColor: "rgba(255,255,255,0.2)",
+            border: "1px solid rgba(255,255,255,0.4)",
+            color: "white",
+            padding: "6px 12px",
+            borderRadius: "20px",
+            cursor: "pointer",
+            fontSize: "0.85rem",
+            fontWeight: "bold",
+            backdropFilter: "blur(4px)",
+          }}
+        >
+          AI 추천 받기
+        </button>
       </div>
 
       <main
         className="chat-container"
         ref={chatContainerRef}
         onScroll={handleScroll}
-        style={{ paddingBottom: "5header0px" }}
+        style={{ paddingBottom: "80px" }}
       >
         {isLoading && (
           <div className="loading-spinner">과거 메시지 로드 중...</div>
@@ -696,11 +682,11 @@ const ChatRoomPage: React.FC = () => {
         <input
           className="message-input"
           placeholder="메시지를 입력하세요..."
-          value={inputValue} // state와 동기화
-          onChange={(e) => setInputValue(e.target.value)} // 입력 시 state 업데이트
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
           onKeyPress={(e) => {
             if (e.key === "Enter") {
-              e.preventDefault(); // 엔터 시 줄바꿈 방지
+              e.preventDefault();
               handleSendMessage();
             }
           }}
@@ -710,7 +696,7 @@ const ChatRoomPage: React.FC = () => {
           onClick={handleSendMessage}
           style={{
             cursor: inputValue.trim() ? "pointer" : "default",
-            opacity: inputValue.trim() ? 1 : 0.6, // 내용 없을 때 시각적 피드백
+            opacity: inputValue.trim() ? 1 : 0.6,
           }}
         >
           ➤
@@ -754,27 +740,28 @@ const ChatRoomPage: React.FC = () => {
               <div className="section-title">
                 참여 멤버 ({members.length}명)
               </div>
+              {/* ✅ ChatMemberList에 handleFollow 연결하여 ESLint 해결 */}
               <ChatMemberList
                 members={members}
                 onFollow={handleFollow}
                 onReport={(id, name) => setReportTarget({ id, name })}
               />
             </div>
-            {/* ✅ 사이드바 하단 모임 관리 버튼 추가 (image_a85aa1.png 디자인 반영) */}
             <div className="menu-section admin-actions">
-              {/* 모임장(LEADER)일 때만 수정 버튼 표시 */}
+              {/* 3. 권한별 버튼 렌더링 조건부 처리 */}
               {isLeader && (
                 <button className="menu-btn" onClick={handleEditMeeting}>
                   <span className="icon">⚙️</span> 모임 정보 수정
                 </button>
               )}
 
-              {/* 공지사항은 추후 구현 */}
-              <button className="menu-btn" onClick={handleEditNotice}>
-                <span className="icon">📢</span> 공지사항 수정
-              </button>
+              {/* 🚩 공지사항 수정: isOrganizer(LEADER)일 때만 노출 */}
+              {isOrganizer && (
+                <button className="menu-btn" onClick={handleEditNotice}>
+                  <span className="icon">📢</span> 공지사항 수정
+                </button>
+              )}
 
-              {/* 상세보기는 누구나 가능 */}
               <button className="menu-btn" onClick={handleMeetingDetail}>
                 <span className="icon">📄</span> 모임 상세보기
               </button>
@@ -790,7 +777,6 @@ const ChatRoomPage: React.FC = () => {
                   roomId={Number(roomId)}
                   onClose={() => setIsInviteModalOpen(false)}
                   onInviteCompleted={() => {
-                    // 멤버 목록 새로고침 (간단히 페이지 리로드 또는 멤버 fetch 함수 재호출)
                     window.location.reload();
                   }}
                 />

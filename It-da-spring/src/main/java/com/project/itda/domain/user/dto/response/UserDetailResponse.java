@@ -32,7 +32,7 @@ public class UserDetailResponse {
                 .phone(user.getPhone())
                 .profileImageUrl(user.getProfileImageUrl())
                 .bio(user.getBio())
-                .gender(user.getGender())
+                .gender(user.getGender() != null ? user.getGender().name() : null)
                 .address(user.getAddress())
                 .status(user.getStatus())
                 .createdAt(user.getCreatedAt())

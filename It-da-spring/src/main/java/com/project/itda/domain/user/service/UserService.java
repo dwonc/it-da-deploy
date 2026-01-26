@@ -120,19 +120,21 @@ public class UserService {
 
         String oldAddress = user.getAddress();
 
-        user.updateInfo(
-                request.getUsername(),
-                request.getPhone(),
-                request.getAddress(),
-                null,
-                null,
-                request.getProfileImageUrl(),
-                request.getBio(),
-                request.getGender(),
-                request.getMbti(),
-                request.getInterests(),
-                request.getIsPublic()
-        );
+        try {
+            user.updateInfo(
+                    request.getUsername(),
+                    request.getPhone(),
+                    request.getAddress(),
+                    null,
+                    null,
+                    request.getProfileImageUrl(),
+                    request.getBio(),
+                    request.getGender(),
+                    request.getMbti(),
+                    request.getInterests(),
+                    request.getIsPublic()
+            );
+            log.info("1. 엔티티 기본 정보 업데이트 성공");
 
         String newAddress = request.getAddress();
         log.info("🔍 주소 → {}", newAddress);
@@ -156,6 +158,11 @@ public class UserService {
 
         userFollowService.notifyProfileUpdate(userId);
         log.info("✅ 프로필 업데이트 및 알림 전송: userId={}", userId);
+
+        } catch (Exception e) {
+            log.error("❌ 프로필 업데이트 중 상세 오류 발생: ", e); // 이 로그가 백엔드 콘솔에 찍힙니다.
+            throw e;
+        }
 
         return UserResponse.from(user);
     }

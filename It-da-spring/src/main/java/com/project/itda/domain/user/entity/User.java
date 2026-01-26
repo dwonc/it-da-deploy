@@ -1,6 +1,7 @@
 package com.project.itda.domain.user.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.project.itda.domain.user.enums.Gender;
 import com.project.itda.domain.user.enums.UserStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -110,8 +111,9 @@ public class User {
     @Column(name = "birth_date")
     private LocalDate birthDate;
 
+    @Enumerated(EnumType.STRING)
     @Column(columnDefinition = "ENUM('M','F','N')")
-    private String gender;
+    private Gender gender;
 
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
@@ -126,7 +128,10 @@ public class User {
         if (longitude != null) this.longitude = longitude;
         if (profileImageUrl != null) this.profileImageUrl = profileImageUrl;
         if (bio != null) this.bio = bio;
-        if (gender != null) this.gender = gender;
+        if (gender != null) {
+            // Gender.fromString을 이용해 안전하게 변환하여 저장
+            this.gender = Gender.fromString(gender);
+        }
         if (mbti != null) this.mbti = mbti;
         if (interests != null) this.interests = interests;
         if (isPublic != null) this.isPublic = isPublic;

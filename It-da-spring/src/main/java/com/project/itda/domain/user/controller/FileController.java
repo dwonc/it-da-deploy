@@ -26,38 +26,45 @@ public class FileController {
     private String uploadDir;
 
     @GetMapping("/{fileName}")
-    public ResponseEntity<Resource> serveChatImage(@PathVariable String fileName) {
-        return serveFile(fileName, "");
+    public ResponseEntity<Resource> serveChatImage(
+            @PathVariable String fileName,
+            @RequestParam(value = "download", defaultValue = "false") boolean download) {
+        return serveFile(fileName, "", download);
     }
 
+    // ✅ [수정 2] 여기도 추가
     @GetMapping("/meetings/{fileName}")
-    public ResponseEntity<Resource> serveMeetingImage(@PathVariable String fileName) {
-        return serveFile(fileName, "meetings"); // 공통 메서드 호출
+    public ResponseEntity<Resource> serveMeetingImage(
+            @PathVariable String fileName,
+            @RequestParam(value = "download", defaultValue = "false") boolean download) {
+        return serveFile(fileName, "meetings", download);
     }
 
-    // ✅ 중복 로직을 처리할 공통 메서드 추가
-    private ResponseEntity<Resource> serveFile(String fileName, String subDir) {
+    // ✅ [수정 3] 공통 메서드 수정: 'boolean download' 파라미터 처리
+    private ResponseEntity<Resource> serveFile(String fileName, String subDir, boolean download) {
         try {
-            // subDir이 있으면 해당 폴더 안에서 찾고, 없으면 uploadDir 바로 아래서 찾음
             Path filePath = Paths.get(uploadDir).resolve(subDir).resolve(fileName).normalize();
             Resource resource = new UrlResource(filePath.toUri());
 
-            log.info("📁 이미지 요청: {}", filePath);
-
             if (resource.exists() && resource.isReadable()) {
-                String contentType = "image/png"; // 기본값
+                String contentType = "image/png";
                 if (fileName.toLowerCase().endsWith(".jpg") || fileName.toLowerCase().endsWith(".jpeg")) {
                     contentType = "image/jpeg";
                 } else if (fileName.toLowerCase().endsWith(".gif")) {
                     contentType = "image/gif";
                 }
 
+                // 한글 파일명 깨짐 방지
                 String encodedFileName = URLEncoder.encode(fileName, StandardCharsets.UTF_8)
                         .replace("+", "%20");
 
+                // ⚡ [핵심] download가 true면 "attachment"(다운로드), 아니면 "inline"(보기)
+                String dispositionType = download ? "attachment" : "inline";
+
                 return ResponseEntity.ok()
                         .contentType(MediaType.parseMediaType(contentType))
-                        .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + encodedFileName + "\"")
+                        // ⚡ 여기가 수정된 부분입니다!
+                        .header(HttpHeaders.CONTENT_DISPOSITION, dispositionType + "; filename=\"" + encodedFileName + "\"")
                         .body(resource);
             } else {
                 log.error("❌ 파일 없음: {}", filePath);
