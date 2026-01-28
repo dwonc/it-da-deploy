@@ -172,6 +172,15 @@ class ChatApi {
             { withCredentials: true }
         );
     }
+    async reportUser(reportedId: number, reason: string, description: string = "") {
+        const response = await axios.post(`${API_BASE_URL}/api/reports`, {
+            reportedType: "USER", // 피신고 대상이 유저인 경우
+            reportedId: reportedId,
+            reason: reason,
+            description: description
+        }, { withCredentials: true });
+        return response.data;
+    }
 }
 
 export const chatApi = new ChatApi();

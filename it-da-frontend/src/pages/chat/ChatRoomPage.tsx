@@ -606,9 +606,15 @@ const ChatRoomPage: React.FC = () => {
 
   const handleReportSubmit = async (reason: string) => {
     if (!reportTarget) return;
-    console.log(`${reportTarget.name}님 신고 접수: ${reason}`);
-    toast.success("신고가 정상적으로 접수되었습니다.");
-    setReportTarget(null);
+      try {
+          // ✅ chatApi를 사용하여 서버에 신고 접수
+          await chatApi.reportUser(reportTarget.id, reason);
+          toast.success("신고가 정상적으로 접수되었습니다.");
+          setReportTarget(null);
+      } catch (error) {
+          toast.error("신고 접수 중 오류가 발생했습니다.");
+          console.error("신고 실패:", error);
+      }
   };
 
   const scrollToBottom = () => {
