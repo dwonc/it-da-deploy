@@ -1,0 +1,41 @@
+# ===== Java/Spring =====
+backend/target/
+backend/build/
+backend/.gradle/
+backend/out/
+backend/*.iml
+backend/.idea/
+
+# ===== Python/FastAPI =====
+ai-service/venv/
+ai-service/__pycache__/
+ai-service/*.pyc
+ai-service/.pytest_cache/
+ai-service/.env
+
+# ===== React/Node =====
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.vite/
+frontend/.env.local
+frontend/.env.production
+
+# ===== Docker =====
+*.log
+
+# ===== IDE =====
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+
+# ===== 민감정보 =====
+*.env
+!.env.example
+*.pem
+*.key

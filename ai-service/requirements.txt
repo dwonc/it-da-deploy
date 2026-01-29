@@ -1,0 +1,40 @@
+# ===============================
+# FastAPI (배포용 - 경량화)
+# ===============================
+# FastAPI Core
+fastapi==0.110.0
+uvicorn[standard]==0.27.1
+pydantic==2.6.1
+pydantic-settings==2.1.0
+python-multipart==0.0.9
+
+# OpenAI
+openai==1.12.0
+
+# Core Numerical
+numpy==1.26.4
+pandas==2.1.4
+
+# ML (LightGBM만 사용)
+scikit-learn==1.3.2
+lightgbm==4.1.0
+
+# HTTP Client
+httpx==0.26.0
+requests==2.31.0
+
+# Redis
+redis==5.0.1
+
+# Database
+pymysql==1.1.0
+
+# Utils
+python-dotenv==1.0.1
+
+# ===============================
+# 배포 시 제외된 패키지:
+# - torch (1GB+)
+# - transformers (500MB+)
+# → KcELECTRA 사용 안 함
+# ===============================

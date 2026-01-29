@@ -1,0 +1,158 @@
+version: '3.8'
+services:
+  # ===================================
+  # MySQL Database
+  # ===================================
+  mysql:
+    image: mysql:8.0
+    container_name: itda-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-1234}
+      MYSQL_DATABASE: itda
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+      TZ: Asia/Seoul
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - itda-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===================================
+  # Redis Cache
+  # ===================================
+  redis:
+    image: redis:7-alpine
+    container_name: itda-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - itda-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===================================
+  # Spring Boot Backend
+  # ===================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: itda-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: itda
+      DB_USERNAME: root
+      DB_PASSWORD: ${DB_PASSWORD:-1234}
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      AI_SERVICE_URL: http://fastapi:8000
+      KAKAO_CLIENT_ID: "33b844074c4a83d0eabbe4c3be7ba694"  # 변경!
+      KAKAO_CLIENT_SECRET: "eDdcxGoLRLDaVhZ97jWnLMY81kgdAwf1"
+      kakao.rest.api.key: "33b844074c4a83d0eabbe4c3be7ba694"  # 추가!
+      kakao.api.key: "518f0864ea1912077f09773a678976f9"
+      GOOGLE_CLIENT_ID: "523085673985-iuniggq3dnmsqningr4v1ppmpmnjebl2.apps.googleusercontent.com"
+      GOOGLE_CLIENT_SECRET: "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"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - itda-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ===================================
+  # FastAPI AI Service
+  # ===================================
+  fastapi:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    container_name: itda-fastapi
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=itda
+      - DB_USERNAME=root
+      - DB_PASSWORD=${DB_PASSWORD:-1234}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - SPRING_BOOT_URL=http://backend:8080
+      - KAKAO_API_KEY=15357c9bee4652654d7745794e66a1c1
+      - KAKAO_REST_API_KEY=33b844074c4a83d0eabbe4c3be7ba694
+    depends_on:
+      redis:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+    networks:
+      - itda-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ===================================
+  # React Frontend (Nginx)
+  # ===================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
+        VITE_KAKAO_MAP_KEY: ${VITE_KAKAO_MAP_KEY}
+    container_name: itda-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - itda-network
+
+# ===================================
+# Networks
+# ===================================
+networks:
+  itda-network:
+    driver: bridge
+
+# ===================================
+# Volumes (데이터 영속성)
+# ===================================
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local

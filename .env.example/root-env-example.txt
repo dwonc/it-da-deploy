@@ -1,0 +1,16 @@
+# ===================================
+# IT-DA Docker Compose 환경변수
+# ===================================
+
+# Database
+DB_PASSWORD=asd123#
+
+# Frontend Build Args
+VITE_API_URL=http://localhost:8080
+VITE_KAKAO_MAP_KEY=518f0864ea1912077f09773a678976f9
+# ===================================
+# 사용법:
+# 1. 이 파일을 .env로 복사
+# 2. 실제 값으로 수정
+# 3. docker-compose up -d 실행
+# ===================================
