@@ -103,7 +103,7 @@ const AIMatchingPage = () => {
     setLoading(true);
     try {
       const response = await fetch(
-        "http://localhost:8000/api/ai/recommendations/search",
+        `${import.meta.env.VITE_API_URL || "https://api.it-da.cloud"}/ai/recommendations/search`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
