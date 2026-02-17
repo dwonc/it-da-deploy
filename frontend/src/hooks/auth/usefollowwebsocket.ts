@@ -3,7 +3,7 @@ import { Client, IMessage } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { useNotificationStore } from "../../stores/useNotificationStore";
 
-const WS_URL = `${import.meta.env.VITE_API_URL ?? import.meta.env.VITE_API_URL ?? "http://localhost:8080"}/ws`;
+const WS_URL = `${import.meta.env.VITE_API_URL ?? import.meta.env.VITE_API_URL ?? "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'"}/ws`;
 
 export interface FollowNotification {
   type: "FOLLOW" | "FOLLOW_REQUEST" | "PROFILE_INFO_UPDATE";

@@ -42,7 +42,7 @@ const MeetingReviewsModal: React.FC<Props> = ({
     setLoading(true);
     try {
       const response = await axios.get(
-        `http://localhost:8080/api/reviews/meeting/${meetingId}`,
+        `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/api/reviews/meeting/${meetingId}`,
         { withCredentials: true },
       );
       setReviews(response.data);

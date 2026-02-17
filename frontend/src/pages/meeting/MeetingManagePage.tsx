@@ -30,16 +30,16 @@ const MeetingManagePage = () => {
     try {
       // 모임 정보
       const meetingRes = await axios.get(
-        `http://localhost:8080/api/meetings/${meetingId}`,
-        { withCredentials: true }
+        `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/api/meetings/${meetingId}`,
+        { withCredentials: true },
       );
       setMeeting(meetingRes.data);
       console.log("✅ 모임 정보:", meetingRes.data);
 
       // 참여자 목록
       const participantsRes = await axios.get(
-        `http://localhost:8080/api/participations/meeting/${meetingId}`,
-        { withCredentials: true }
+        `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/api/participations/meeting/${meetingId}`,
+        { withCredentials: true },
       );
       console.log("✅ 참여자 목록:", participantsRes.data);
       setParticipants(participantsRes.data.participants || []);
@@ -53,9 +53,9 @@ const MeetingManagePage = () => {
   const handleApprove = async (participationId: number) => {
     try {
       await axios.post(
-        `http://localhost:8080/api/participations/${participationId}/approve`,
+        `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/api/participations/${participationId}/approve`,
         {},
-        { withCredentials: true }
+        { withCredentials: true },
       );
       alert("✅ 참여를 승인했습니다.");
       fetchMeetingData();
@@ -70,9 +70,9 @@ const MeetingManagePage = () => {
 
     try {
       await axios.post(
-        `http://localhost:8080/api/participations/${participationId}/reject`,
+        `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/api/participations/${participationId}/reject`,
         { reason: reason || "주최자가 거절하였습니다." },
-        { withCredentials: true }
+        { withCredentials: true },
       );
       alert("❌ 참여를 거절했습니다.");
       fetchMeetingData();
@@ -138,10 +138,10 @@ const MeetingManagePage = () => {
   }
 
   const pendingParticipants = participants.filter(
-    (p) => p.status === "PENDING"
+    (p) => p.status === "PENDING",
   );
   const approvedParticipants = participants.filter(
-    (p) => p.status === "APPROVED"
+    (p) => p.status === "APPROVED",
   );
 
   return (

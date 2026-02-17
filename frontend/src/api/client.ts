@@ -4,7 +4,7 @@ const baseURL =
   (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL) ??
   import.meta.env.VITE_API_URL ??
   import.meta.env.VITE_API_URL ??
-  "http://localhost:8080";
+  "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'";
 
 export const apiClient = axios.create({
   baseURL,

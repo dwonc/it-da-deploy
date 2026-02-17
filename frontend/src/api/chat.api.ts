@@ -6,8 +6,10 @@ import { useChatStore } from "@/stores/useChatStore";
 const API_BASE_URL =
   import.meta.env.VITE_API_URL ??
   import.meta.env.VITE_API_URL ??
-  "http://localhost:8080";
-const WEBSOCKET_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080"; // ✅ 추가
+  "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'";
+const WEBSOCKET_URL =
+  import.meta.env.VITE_API_URL ??
+  "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'"; // ✅ 추가
 
 // ✅ metadata를 위한 구체적 타입 정의 (any 제거)
 export interface ChatMessage {
@@ -104,7 +106,7 @@ class ChatApi {
     this.client = new Client({
       webSocketFactory: () =>
         new SockJS(
-          `${import.meta.env.VITE_API_URL ?? "http://localhost:8080"}/ws`,
+          `${import.meta.env.VITE_API_URL ?? "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'"}/ws`,
         ),
       connectHeaders: {},
       debug: (str) => console.log("STOMP:", str),

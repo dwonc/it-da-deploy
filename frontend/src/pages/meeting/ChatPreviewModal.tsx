@@ -39,8 +39,8 @@ const ChatPreviewModal = ({
   const fetchMeetingInfo = async () => {
     try {
       const response = await axios.get(
-        `http://localhost:8080/api/meetings/${meetingId}`,
-        { withCredentials: true }
+        `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/api/meetings/${meetingId}`,
+        { withCredentials: true },
       );
       setMeeting(response.data);
     } catch (err) {

@@ -2,7 +2,7 @@
 import axios from 'axios';
 import { Meeting, MeetingDetail, MeetingListResponse } from '@/types/meeting.types';
 
-const API_BASE_URL = 'http://localhost:8080/api';
+const API_BASE_URL = 'import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/api';
 
 // Axios 인스턴스 (세션 쿠키 포함)
 const axiosInstance = axios.create({

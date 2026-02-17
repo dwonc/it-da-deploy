@@ -392,7 +392,7 @@ const ChatMessage: React.FC<Props> = ({ message, isMine, onLocationClick }) => {
 
     // 3. IMAGE 타입
     if (message.type === "IMAGE") {
-      const imageUrl = `http://localhost:8080${message.content}`;
+      const imageUrl = `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'${message.content}`;
       // 백엔드 FileController 수정이 되어있어야 ?download=true가 작동합니다.
       const downloadUrl = `${imageUrl}?download=true`;
 

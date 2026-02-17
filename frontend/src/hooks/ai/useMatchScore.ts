@@ -39,13 +39,13 @@ export function useMatchScores(userId?: number, meetingIds: number[] = []) {
       setLoading(true);
       try {
         const res = await axios.post(
-          "http://localhost:8080/api/ai/recommendations/match-scores",
+          "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/api/ai/recommendations/match-scores",
           { userId, meetingIds },
           {
             withCredentials: true,
             timeout: 30000, // ✅ 일단 30초로(원인 잡히면 줄여)
             signal: abortRef.current.signal,
-          }
+          },
         );
 
         const items: MatchItem[] = res.data?.items ?? [];

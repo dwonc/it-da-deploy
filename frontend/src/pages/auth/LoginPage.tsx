@@ -21,26 +21,25 @@ const LoginPage = () => {
     }
 
     try {
+      const response = await login(formData);
 
-        const response = await login(formData);
-
-        // 👇 관리자/일반 사용자 구분
-        if (response?.userType === 'ADMIN') {
-            toast.success("관리자 로그인 성공!");
-            navigate("/admin/dashboard");
-        } else {
-            toast.success("로그인 성공!");
-            navigate("/");
-        }
+      // 👇 관리자/일반 사용자 구분
+      if (response?.userType === "ADMIN") {
+        toast.success("관리자 로그인 성공!");
+        navigate("/admin/dashboard");
+      } else {
+        toast.success("로그인 성공!");
+        navigate("/");
+      }
     } catch {
-        toast.error("로그인에 실패했습니다.");
+      toast.error("로그인에 실패했습니다.");
     }
   };
 
   // 소셜 로그인 핸들러
   const handleSocialLogin = (provider: string) => {
     // 백엔드 Spring Security OAuth2 엔드포인트로 이동
-    window.location.href = `http://localhost:8080/oauth2/authorization/${provider}`;
+    window.location.href = `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/oauth2/authorization/${provider}`;
   };
 
   return (

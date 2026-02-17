@@ -23,8 +23,8 @@ export default function AiRecommendSection({ userId }: Props) {
 
     try {
       const res = await axios.get<PersonalizedMeetingResponse>(
-        `http://localhost:8080/api/ai/recommendations/personalized/${userId}`,
-        { withCredentials: true }
+        `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/api/ai/recommendations/personalized/${userId}`,
+        { withCredentials: true },
       );
 
       if (!res.data.success) {
@@ -50,7 +50,7 @@ export default function AiRecommendSection({ userId }: Props) {
   const meetingId = meeting?.meetingId;
   const { matchMap, loading } = useMatchScores(
     userId,
-    meetingId ? [meetingId] : []
+    meetingId ? [meetingId] : [],
   );
   const matchPercentage = meetingId ? matchMap[meetingId]?.matchPercentage : 0;
 

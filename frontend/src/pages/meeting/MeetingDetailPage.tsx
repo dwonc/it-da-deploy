@@ -83,7 +83,9 @@ const MeetingDetailPage = () => {
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
-  const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
+  const API_ORIGIN =
+    import.meta.env.VITE_API_URL ??
+    "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'";
 
   // ✅ 최근 조회 모임 localStorage에 저장하는 함수
   const saveToRecentViewed = (meetingData: MeetingDetail) => {
@@ -153,7 +155,10 @@ const MeetingDetailPage = () => {
   useEffect(() => {
     if (meeting) {
       console.log("🖼️ 모임 이미지 URL:", meeting.imageUrl);
-      console.log("🖼️ 전체 URL:", `http://localhost:8080${meeting.imageUrl}`);
+      console.log(
+        "🖼️ 전체 URL:",
+        `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'${meeting.imageUrl}`,
+      );
     }
   }, [meeting]);
 
@@ -166,7 +171,7 @@ const MeetingDetailPage = () => {
   const fetchMeetingDetail = async () => {
     try {
       const response = await axios.get(
-        `http://localhost:8080/api/meetings/${meetingId}`,
+        `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/api/meetings/${meetingId}`,
         { withCredentials: true },
       );
       console.log("✅ 모임 정보:", response.data);
@@ -177,7 +182,7 @@ const MeetingDetailPage = () => {
       if (!meetingData.participants || meetingData.participants.length === 0) {
         try {
           const participantsRes = await axios.get(
-            `http://localhost:8080/api/participations/meeting/${meetingId}`,
+            `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/api/participations/meeting/${meetingId}`,
             { withCredentials: true },
           );
 
@@ -287,7 +292,7 @@ const MeetingDetailPage = () => {
       });
 
       const response = await axios.get(
-        `http://localhost:8080/api/ai/recommendations/satisfaction`,
+        `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/api/ai/recommendations/satisfaction`,
         {
           params: {
             userId: user.userId,
@@ -376,7 +381,7 @@ const MeetingDetailPage = () => {
 
     try {
       const response = await axios.get(
-        "http://localhost:8080/api/ai/recommendations/meetings",
+        "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/api/ai/recommendations/meetings",
         {
           params: {
             user_id: user.userId, // 백엔드가 이걸로 받는다고 했으니 유지
@@ -476,7 +481,7 @@ const MeetingDetailPage = () => {
 
     try {
       await axios.post(
-        "http://localhost:8080/api/participations",
+        "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/api/participations",
         {
           meetingId: meeting?.meetingId,
           userId: user.userId, // ✅ 여기 추가!

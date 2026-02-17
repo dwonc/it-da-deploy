@@ -22,7 +22,7 @@ interface ChatRoomGridProps {
 const API_ORIGIN =
   import.meta.env.VITE_API_ORIGIN ??
   import.meta.env.VITE_API_URL ??
-  "http://localhost:8080";
+  "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'";
 
 const toAbsUrl = (url?: string) => {
   if (!url) return "";

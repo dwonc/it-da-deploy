@@ -78,7 +78,7 @@ export function useBadgeWebSocket({
       return;
     }
 
-    const wsUrl = `${import.meta.env.VITE_API_URL ?? import.meta.env.VITE_API_URL ?? "http://localhost:8080"}/ws`;
+    const wsUrl = `${import.meta.env.VITE_API_URL ?? import.meta.env.VITE_API_URL ?? "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'"}/ws`;
 
     const client = new Client({
       webSocketFactory: () => new SockJS(wsUrl),

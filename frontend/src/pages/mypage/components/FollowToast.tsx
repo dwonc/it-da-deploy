@@ -39,7 +39,7 @@ const FollowToast: React.FC<Props> = ({
     if (notification.fromProfileImage) {
       const imgUrl = notification.fromProfileImage.startsWith("http")
         ? notification.fromProfileImage
-        : `http://localhost:8080${notification.fromProfileImage}`;
+        : `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'${notification.fromProfileImage}`;
       return <img src={imgUrl} alt="" className="toast-avatar-img" />;
     }
     const initial = notification.fromUsername?.charAt(0).toUpperCase() || "?";

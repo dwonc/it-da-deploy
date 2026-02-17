@@ -3,7 +3,9 @@ import { useNavigate } from "react-router-dom";
 import "./MyMeetings.css";
 import { MyMeeting, OrganizedMeeting } from "../../../api/mypage.api";
 
-const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
+const API_ORIGIN =
+  import.meta.env.VITE_API_URL ??
+  "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'";
 const DEFAULT_IMAGE =
   "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=400&q=80";
 

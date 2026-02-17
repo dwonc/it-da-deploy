@@ -19,7 +19,7 @@ import { Client, IMessage } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import "./UserProfile.css";
 
-const WS_URL = `${import.meta.env.VITE_API_URL ?? import.meta.env.VITE_API_URL ?? "http://localhost:8080"}/ws`;
+const WS_URL = `${import.meta.env.VITE_API_URL ?? import.meta.env.VITE_API_URL ?? "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'"}/ws`;
 
 type TabKey = "meetings" | "archive" | "stats";
 
@@ -676,7 +676,7 @@ const UserProfile: React.FC = () => {
     if (!profile?.profileImageUrl) return null;
     if (profile.profileImageUrl.startsWith("http"))
       return profile.profileImageUrl;
-    return `http://localhost:8080${profile.profileImageUrl}`;
+    return `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'${profile.profileImageUrl}`;
   };
 
   if (loading) {

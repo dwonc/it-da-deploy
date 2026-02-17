@@ -8,7 +8,7 @@ import styles from "./MeetingListPage.module.css";
 const API_ORIGIN =
   import.meta.env.VITE_API_ORIGIN ??
   import.meta.env.VITE_API_URL ??
-  "http://localhost:8080";
+  "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'";
 
 const DEFAULT_IMAGE =
   "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400";

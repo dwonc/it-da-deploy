@@ -4,7 +4,7 @@ import SockJS from "sockjs-client";
 import { useUserChatStore, UserChatMessage } from "@/stores/useUserChatStore";
 import { useNotificationStore } from "@/stores/useNotificationStore";
 
-const WS_URL = `${import.meta.env.VITE_API_URL ?? import.meta.env.VITE_API_URL ?? "http://localhost:8080"}/ws`;
+const WS_URL = `${import.meta.env.VITE_API_URL ?? import.meta.env.VITE_API_URL ?? "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'"}/ws`;
 
 interface UseUserChatWebSocketProps {
   userId?: number;

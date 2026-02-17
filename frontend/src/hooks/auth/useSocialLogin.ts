@@ -2,7 +2,9 @@ import { useAuthStore } from "@/stores/useAuthStore.ts";
 import { useCallback } from "react";
 import axios from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ??
+  "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'";
 
 export const useSocialLogin = () => {
   const { setSocialUser } = useAuthStore();

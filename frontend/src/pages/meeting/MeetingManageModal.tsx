@@ -41,7 +41,7 @@ const MeetingManageModal = ({
     setLoading(true);
     try {
       const response = await axios.get(
-        `http://localhost:8080/api/participations/meeting/${meetingId}`,
+        `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/api/participations/meeting/${meetingId}`,
         { withCredentials: true },
       );
       setParticipants(response.data.participants || []);
@@ -55,7 +55,7 @@ const MeetingManageModal = ({
   const handleApprove = async (participationId: number) => {
     try {
       await axios.post(
-        `http://localhost:8080/api/participations/${participationId}/approve`,
+        `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/api/participations/${participationId}/approve`,
         {},
         { withCredentials: true },
       );
@@ -74,7 +74,7 @@ const MeetingManageModal = ({
 
     try {
       await axios.post(
-        `http://localhost:8080/api/participations/${participationId}/reject`,
+        `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/api/participations/${participationId}/reject`,
         { reason: reason || "주최자가 거절하였습니다." },
         { withCredentials: true },
       );
@@ -108,7 +108,7 @@ const MeetingManageModal = ({
 
     try {
       const response = await axios.post(
-        `http://localhost:8080/api/meetings/${meetingId}/complete`,
+        `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/api/meetings/${meetingId}/complete`,
         {},
         { withCredentials: true },
       );

@@ -68,7 +68,7 @@ const Header = () => {
       if (profileImage.startsWith("http")) {
         return profileImage;
       }
-      return `http://localhost:8080${profileImage}`;
+      return `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'${profileImage}`;
     }
     return null;
   };

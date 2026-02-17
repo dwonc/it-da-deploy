@@ -1,7 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 
 // API Base URL (환경변수로 관리)
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/api';
 
 // Axios 인스턴스 생성
 export const api = axios.create({

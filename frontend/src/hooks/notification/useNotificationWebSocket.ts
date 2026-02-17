@@ -7,7 +7,7 @@ import { useNotificationStore } from "@/stores/useNotificationStore";
 import toast from "react-hot-toast";
 import { router } from "@/router/index";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'";
 
 export const useNotificationWebSocket = () => {
   const user = useAuthStore((state) => state.user);
@@ -22,7 +22,7 @@ export const useNotificationWebSocket = () => {
     const client = new Client({
       webSocketFactory: () =>
         new SockJS(
-          `${import.meta.env.VITE_API_URL ?? import.meta.env.VITE_API_URL ?? "http://localhost:8080"}/ws`,
+          `${import.meta.env.VITE_API_URL ?? import.meta.env.VITE_API_URL ?? "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'"}/ws`,
         ),
       reconnectDelay: 5000,
       onConnect: () => {

@@ -1,7 +1,7 @@
 // src/api/category.api.ts
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_ORIGIN ?? 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_API_ORIGIN ?? 'import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'';
 
 // Axios 인스턴스 (세션 쿠키 포함)
 const axiosInstance = axios.create({
