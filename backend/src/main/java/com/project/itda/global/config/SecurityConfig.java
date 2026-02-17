@@ -89,7 +89,9 @@ public class SecurityConfig {
                 "http://localhost:3000",
                 "http://localhost:5173",
                 "http://3.34.173.79:3000",
-                "https://it-da.cloud"
+                "https://it-da.cloud",
+                "https://api.it-da.cloud"  // ✅ 추가!
+
         ));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
