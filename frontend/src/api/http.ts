@@ -8,8 +8,7 @@ import axios from "axios";
 export const http = axios.create({
   baseURL:
     process.env.REACT_APP_API_BASE_URL ??
-    import.meta.env.VITE_API_URL ??
-    "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'",
+    `${import.meta.env.VITE_API_URL || "https://api.it-da.cloud"}`,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",

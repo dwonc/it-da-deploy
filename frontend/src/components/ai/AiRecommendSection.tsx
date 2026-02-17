@@ -23,7 +23,7 @@ export default function AiRecommendSection({ userId }: Props) {
 
     try {
       const res = await axios.get<PersonalizedMeetingResponse>(
-        `import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'/api/ai/recommendations/personalized/${userId}`,
+        `${import.meta.env.VITE_API_URL || "https://api.it-da.cloud"}/api/ai/recommendations/personalized/${userId}`,
         { withCredentials: true },
       );
 

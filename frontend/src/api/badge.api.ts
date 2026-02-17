@@ -9,7 +9,7 @@ export type Badge = UserBadgeDto;
 const http = axios.create({
   baseURL:
     import.meta.env?.VITE_API_BASE_URL ??
-    "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'",
+    `${import.meta.env.VITE_API_URL || "https://api.it-da.cloud"}`,
   withCredentials: true,
   headers: { "Content-Type": "application/json" },
 });

@@ -6,8 +6,7 @@ import SafeImage from "../common/SafeImage";
 
 const API_ORIGIN =
   import.meta.env.VITE_API_ORIGIN ??
-  import.meta.env.VITE_API_URL ??
-  "import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'";
+  `${import.meta.env.VITE_API_URL || "https://api.it-da.cloud"}`;
 
 const toAbsUrl = (url?: string) => {
   if (!url) return "";
