@@ -1,0 +1,37 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy to EC2
+        env:
+          PRIVATE_KEY: ${{ secrets.EC2_SSH_KEY }}
+          HOST: ${{ secrets.EC2_HOST }}
+          USER: ubuntu
+        run: |
+          echo "$PRIVATE_KEY" > private_key.pem
+          chmod 600 private_key.pem
+
+          # EC2에 파일 전송
+          scp -i private_key.pem -o StrictHostKeyChecking=no -r \
+            docker-compose.yml backend frontend ai-service \
+            $USER@$HOST:~/it-da-deploy/
+
+          # EC2에서 배포 실행
+          ssh -i private_key.pem -o StrictHostKeyChecking=no $USER@$HOST << 'EOF'
+            cd ~/it-da-deploy
+            docker-compose down
+            docker-compose up --build -d
+          EOF
+
+          rm -f private_key.pem
