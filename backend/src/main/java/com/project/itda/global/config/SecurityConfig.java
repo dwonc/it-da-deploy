@@ -75,7 +75,7 @@ public class SecurityConfig {
                         .successHandler(oAuth2SuccessHandler)
                         .failureHandler((request, response, exception) -> {
                             log.error("❌ OAuth2 로그인 실패: ", exception);
-                            response.sendRedirect("http://localhost:3000/login?error=oauth_failed");
+                            response.sendRedirect("https://it-da.cloud/login?error=oauth_failed");
                         })
                 );
 

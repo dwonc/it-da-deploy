@@ -18,7 +18,7 @@ RUN npm install
 COPY . .
 
 # 환경변수 설정 (빌드 타임)
-ARG VITE_API_URL=http://localhost:8080
+ARG VITE_API_URL=import.meta.env.VITE_API_URL || 'https://api.it-da.cloud'
 ARG VITE_KAKAO_MAP_KEY
 ENV VITE_API_URL=$VITE_API_URL
 ENV VITE_KAKAO_MAP_KEY=$VITE_KAKAO_MAP_KEY
