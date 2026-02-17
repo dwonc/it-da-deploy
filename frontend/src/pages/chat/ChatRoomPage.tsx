@@ -13,6 +13,7 @@ import BillInputModal from "../../components/chat/BillInputModal";
 import PollInputModal from "../../components/chat/PollInputModal";
 import api from "@/api/axios.config";
 import InviteMemberModal from "@/components/chat/InviteMemberModal.tsx";
+import NotificationBell from "@/components/chat/NotificationBell.tsx";
 
 // ... (Interface 정의는 동일하게 유지)
 interface BillData {
@@ -40,16 +41,20 @@ interface RawMemberResponse {
   role?: string;
   isFollowing: boolean;
 }
+interface RecommendedPlace {
+  placeName: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  distanceKm?: number;
+}
 
 const ChatRoomPage: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
-  const {
-    messages,
-    addMessage,
-    setMessages,
-    markAllAsRead,
-    decrementUnreadCount,
-  } = useChatStore();
+  const messages = useChatStore((s) => s.messages);
+  const addMessage = useChatStore((s) => s.addMessage);
+  const setMessages = useChatStore((s) => s.setMessages);
+  const updateUnreadCount = useChatStore((s) => s.updateUnreadCount);
   const [members, setMembers] = useState<User[]>([]);
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const { user: currentUser } = useAuthStore();
@@ -83,11 +88,86 @@ const ChatRoomPage: React.FC = () => {
 
   const [notice, setNotice] = useState<string>("");
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [recommendedPlaces, setRecommendedPlaces] = useState<
+    RecommendedPlace[]
+  >([]);
+  const [isPlaceModalOpen, setIsPlaceModalOpen] = useState(false);
+  const [selectedMapPlace, setSelectedMapPlace] = useState<any>(null);
+  const [isMapModalOpen, setIsMapModalOpen] = useState(false);
+  const isMounted = useRef(false);
+  const [isChoiceModalOpen, setIsChoiceModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (roomId) {
+      const savedPlaces = localStorage.getItem(`rec_places_${roomId}`);
+      if (savedPlaces) {
+        try {
+          setRecommendedPlaces(JSON.parse(savedPlaces));
+        } catch (e) {
+          console.error("저장된 장소 로드 실패:", e);
+          localStorage.removeItem(`rec_places_${roomId}`); // 오염된 데이터 삭제
+        }
+      }
+    }
+  }, [roomId]);
+
+  const sendLocationMessage = async (place: any) => {
+    if (!roomId || !currentUser || !linkedMeetingId) {
+      toast.error("모임 정보가 연결되지 않았습니다.");
+      return;
+    }
+
+    try {
+      // ✅ 1. 백엔드 모임 테이블 업데이트 (API 경로는 프로젝트 구조에 맞게 수정 필요)
+      await api.patch(`/meetings/${linkedMeetingId}/location`, {
+        locationName: place.placeName,
+        locationAddress: place.address,
+        latitude: place.latitude,
+        longitude: place.longitude,
+      });
+
+      // 2. 채팅방에 확정 메시지 전송
+      chatApi.sendMessage(
+        Number(roomId),
+        currentUser.email,
+        currentUser.userId,
+        `📍 확정된 모임 장소: ${place.placeName}\n주소: ${place.address}`,
+        "LOCATION",
+        {
+          placeName: place.placeName,
+          address: place.address,
+          lat: place.latitude,
+          lng: place.longitude,
+          isAiRecommendation: true,
+        },
+      );
+
+      setIsPlaceModalOpen(false);
+      toast.success("모임 장소가 확정 및 업데이트되었습니다!");
+    } catch (error) {
+      console.error("장소 업데이트 실패:", error);
+      toast.error("장소 정보 저장 중 오류가 발생했습니다.");
+    }
+  };
+
+  const handleAIButtonClick = () => {
+    // 이전에 저장된 추천 목록이 있다면 -> 선택 모달 띄우기
+    if (recommendedPlaces.length > 0) {
+      setIsPlaceModalOpen(false);
+      setIsChoiceModalOpen(true);
+    } else {
+      // 없으면 -> 바로 AI API 호출
+      fetchNewRecommendations();
+    }
+  };
 
   // 1️⃣ [수정됨] showAIRecommendation 함수를 return 문 밖(컴포넌트 로직 부분)으로 이동
-  const showAIRecommendation = async () => {
+  const fetchNewRecommendations = async () => {
+    setIsChoiceModalOpen(false);
+    setIsPlaceModalOpen(false);
+
     try {
-      toast.loading("🤖 AI가 최적의 장소를 분석하고 있습니다...", {
+      toast.loading("🤖 AI가 최적의 장소를 분석 중입니다...", {
         id: "ai-loading",
       });
 
@@ -97,48 +177,71 @@ const ChatRoomPage: React.FC = () => {
 
       toast.dismiss("ai-loading");
 
-      if (!response.data.success || !response.data.recommendations?.length) {
+      if (response.data.success && response.data.recommendations?.length > 0) {
+        const places = response.data.recommendations;
+
+        // 1️⃣ 서버 DB에 저장될 상세 메타데이터 구성 (새로고침 시 스타일 유지의 핵심)
+        const recommendationMetadata = {
+          isAiRecommendation: true,
+          centroid: response.data.centroid,
+          recommendations: places.map((p: any) => ({
+            placeName: p.placeName || p.name,
+            address: p.address,
+            latitude: p.latitude,
+            longitude: p.longitude,
+            distanceKm: p.distanceKm || p.distanceFromCentroid,
+            matchReasons: p.matchReasons,
+          })),
+        };
+
+        // 2️⃣ 채팅방에 표시될 텍스트 내용 구성
+        const chatMessageContent =
+          `🤖 AI가 최적의 장소를 추천해드립니다!\n\n` +
+          `📍 중간 지점: ${response.data.centroid?.address || "계산 완료"}\n\n` +
+          places
+            .map(
+              (p: any, idx: number) =>
+                `${idx + 1}. ${p.placeName || p.name} ⭐\n` +
+                `📍 ${p.address}\n` +
+                `🏃 중간지점에서 ${p.distanceKm?.toFixed(1) || p.distanceFromCentroid?.toFixed(1) || 0}km\n` +
+                `💡 ${p.matchReasons?.join(", ") || "접근성이 좋은 장소예요"}`,
+            )
+            .join("\n\n");
+
+        // 3️⃣ 서버로 메시지 전송 (metadata를 반드시 포함해야 새로고침 시 유지됨)
+        chatApi.sendMessage(
+          Number(roomId),
+          currentUser!.email,
+          currentUser!.userId,
+          chatMessageContent,
+          "TALK",
+          {
+            isAiRecommendation: true,
+            ...recommendationMetadata,
+            centroid: response.data.centroid,
+          },
+        );
+
+        // 4️⃣ 로컬 상태 업데이트
+        setRecommendedPlaces(recommendationMetadata.recommendations);
+        localStorage.setItem(
+          `rec_places_${roomId}`,
+          JSON.stringify(recommendationMetadata.recommendations),
+        );
+        setIsPlaceModalOpen(true);
+
+        toast.success("AI 추천이 완료되었습니다!");
+      } else {
         toast.error(response.data.message || "추천 가능한 장소가 없습니다.");
-        return;
       }
-
-      const places = response.data.recommendations;
-
-      const message =
-        `🤖 AI가 최적의 장소를 추천해드립니다!\n\n` +
-        `📍 중간 지점: ${response.data.centroid?.address || "계산 완료"}\n\n` +
-        places
-          .map(
-            (p: any, idx: number) =>
-              `${idx + 1}. ${p.placeName} ⭐\n` +
-              `   📍 ${p.address}\n` +
-              `   🚶 중간지점에서 ${p.distanceKm?.toFixed(1) || 0}km\n` +
-              `   💡 ${p.matchReasons?.join(", ") || "접근성이 좋아요"}`,
-          )
-          .join("\n\n");
-
-      // 단순히 Toast만 띄우는 것이 아니라 채팅방에 메시지로 쏘고 싶다면 아래 주석 해제
-      chatApi.sendMessage(
-        Number(roomId),
-        currentUser!.email,
-        currentUser!.userId,
-        message,
-        "TALK",
-        {},
-      );
-
-      toast(message, {
-        duration: 8000,
-        icon: "🤖",
-      });
     } catch (error: any) {
-        console.error("AI 추천 실패:", error);
-        // 🚨 [수정] 500 에러 발생 시 데이터 부족 가능성 안내
-        const errorMsg = error.response?.status === 500
-            ? "주변에 적절한 장소가 없거나 위치 정보가 부족합니다."
-            : "장소 추천을 불러올 수 없습니다.";
-        toast.error(errorMsg);
-        toast.dismiss("ai-loading");
+      console.error("AI 추천 실패:", error);
+      const errorMsg =
+        error.response?.status === 500
+          ? "주변에 적절한 장소가 없거나 위치 정보가 부족합니다."
+          : "장소 추천을 불러올 수 없습니다.";
+      toast.error(errorMsg);
+      toast.dismiss("ai-loading");
     }
   };
 
@@ -269,7 +372,16 @@ const ChatRoomPage: React.FC = () => {
   useEffect(() => {
     const initChat = async () => {
       if (!roomId || !currentUser) return;
-      console.log("🔍 [ChatRoom] Initializing with RoomID:", roomId);
+
+      if (!isMounted.current) {
+        try {
+          // ✅ READ 신호 전송 (서버의 activeUsers에 등록)
+          // await chatApi.markAsRead(Number(roomId));
+        } catch (e) {
+          console.warn("⚠️ 읽음 처리 실패:", e);
+        }
+        isMounted.current = true;
+      }
 
       try {
         try {
@@ -279,7 +391,7 @@ const ChatRoomPage: React.FC = () => {
               ...msg,
               senderNickname: msg.senderNickname || "사용자",
               content: msg.content || "",
-              unreadCount: Number(msg.unreadCount ?? 0),
+              unreadCount: Number(msg.unreadCount ?? 0), // ✅ 서버 값 유지
               sentAt: msg.sentAt || new Date().toISOString(),
               type: msg.type as ChatMessage["type"],
               metadata: msg.metadata || null,
@@ -291,29 +403,24 @@ const ChatRoomPage: React.FC = () => {
         }
 
         try {
-          await chatApi.markAsRead(Number(roomId), currentUser.email);
-          markAllAsRead();
-        } catch (e) {
-          console.warn("⚠️ 읽음 처리 실패 (API 확인 필요):", e);
-        }
-
-        try {
           const rooms = await chatApi.getRooms();
           const currentRoom = rooms.find(
             (r: any) => r.chatRoomId === Number(roomId),
           );
           if (currentRoom) {
             setRoomTitle(currentRoom.roomName);
-            if (currentRoom.meetingId) {
-              setLinkedMeetingId(currentRoom.meetingId);
-              console.log("🔗 연결된 모임 ID:", currentRoom.meetingId);
-            }
-            if (currentRoom.notice) {
-              setNotice(currentRoom.notice);
+            setNotice(currentRoom.notice || "");
+
+            const mId = currentRoom.meetingId || currentRoom.meeting?.id;
+            if (mId) {
+              setLinkedMeetingId(Number(mId));
+              console.log("🔗 연결된 모임 ID 설정 완료:", mId);
+            } else {
+              console.warn("⚠️ 이 채팅방에 연결된 모임 ID가 없습니다.");
             }
           }
         } catch (e) {
-          console.warn("⚠️ 방 제목 로드 실패");
+          console.warn("⚠️ 방 정보 로드 실패", e);
         }
 
         try {
@@ -350,7 +457,7 @@ const ChatRoomPage: React.FC = () => {
       } catch (e) {
         console.error("🚨 예상치 못한 치명적 오류:", e);
       }
-        await fetchRoomMembers();
+      await fetchRoomMembers();
     };
 
     initChat();
@@ -359,84 +466,217 @@ const ChatRoomPage: React.FC = () => {
 
     if (roomId && currentUser?.email) {
       chatApi.disconnect();
+      console.log("🔄 WebSocket 연결 시작...");
 
-      chatApi.connect(
-        Number(roomId),
-        currentUser.email,
-        (newMsg: any) => {
-          if (!isSubscribed) return;
+      const normalizeType = (raw: any) => {
+        let t = String(raw ?? "");
 
-          if (newMsg.type === "BILL_UPDATE") {
-            const targetId = Number(
-              newMsg.targetMessageId || newMsg.metadata.messageId,
-            );
-            addMessage({
-              ...newMsg,
-              messageId: targetId,
-              type: "BILL",
-              metadata:
-                typeof newMsg.metadata === "string"
-                  ? JSON.parse(newMsg.metadata)
-                  : newMsg.metadata,
-            });
+        // 디버그용: 눈에 안 보이는 문자 확인하려고 trim은 마지막에
+        // (중간 과정에서 뭐가 섞였는지 보고 싶으면 아래 debug에서 raw도 찍자)
+        t = t.toUpperCase();
+
+        // 공백/하이픈 → _
+        t = t.replace(/[\s-]+/g, "_");
+
+        // 제로폭 문자 제거
+        t = t.replace(/[\u200B-\u200D\uFEFF]/g, "");
+
+        // 마지막 trim
+        t = t.trim();
+
+        // A~Z/_만 남김
+        t = t.replace(/[^A-Z_]/g, "");
+
+        // UNREAD_UPDATE 강제 매핑(변형 케이스도 잡기)
+        if (t.includes("UNREAD") && t.includes("UPDATE"))
+          return "UNREAD_UPDATE";
+        if (t === "READ") return "READ";
+
+        return t;
+      };
+
+      const debugType = (label: string, value: string) => {
+        console.log(label, {
+          shown: value,
+          json: JSON.stringify(value),
+          length: value.length,
+          codes: Array.from(value).map((ch) => ch.charCodeAt(0)),
+          equals_UNREAD_UPDATE: value === "UNREAD_UPDATE",
+        });
+      };
+
+      chatApi.connect(Number(roomId), currentUser.email, (newMsg: any) => {
+        if (!isSubscribed) return;
+
+        const type = normalizeType(newMsg?.type);
+
+        console.log("📨 RAW 수신:", newMsg);
+
+        // ✅ 1) UNREAD_UPDATE 최우선 처리
+        if (type === "UNREAD_UPDATE") {
+          // ❌ 기존 코드 (문제!)
+          // const targetId = Number(newMsg?.targetMessageId ?? newMsg?.messageId);
+
+          // ✅ 수정된 코드
+          const targetId = Number(newMsg?.messageId); // 백엔드에서 messageId로 보냄!
+          const unread = Number(newMsg?.unreadCount ?? 0);
+
+          console.log("🔔 UNREAD_UPDATE apply:", {
+            targetId,
+            unread,
+            rawMessageId: newMsg?.messageId,
+            rawUnreadCount: newMsg?.unreadCount,
+          });
+
+          if (!targetId) {
+            console.warn("⚠️ UNREAD_UPDATE인데 targetId 없음", newMsg);
             return;
           }
-          if (newMsg.type === "NOTICE") {
-              fetchRoomMembers();
-          }
-          const serverCount = Number(newMsg.unreadCount ?? 0);
 
-          const validatedMsg: ChatMessage = {
-            ...newMsg,
-            unreadCount: serverCount,
-            senderNickname: newMsg.senderNickname || "사용자",
-            sentAt: newMsg.sentAt || new Date().toISOString(),
-            senderId: Number(newMsg.senderId),
-            messageId: Number(newMsg.messageId) || Date.now(),
-            metadata:
-              typeof newMsg.metadata === "string"
-                ? JSON.parse(newMsg.metadata)
-                : newMsg.metadata,
-          };
-
-          addMessage(validatedMsg);
-        },
-        (readData: any) => {
-          console.log("📖 읽음 이벤트 수신:", readData);
-          if (currentUser && readData.email !== currentUser.email) {
-            decrementUnreadCount();
-          }
-        },
-      );
-    }
-    return () => {
-      isSubscribed = false;
-      chatApi.disconnect();
-    };
-  }, [roomId, currentUser, setMessages, markAllAsRead, decrementUnreadCount]);
-
-    const fetchRoomMembers = async () => {
-        if (!roomId) return;
-        try {
-            const rawMembers = await chatApi.getRoomMembers(Number(roomId));
-            const formattedMembers: User[] = rawMembers.map((m: any) => ({
-                id: m.userId,
-                userId: m.userId,
-                name: m.nickname?.trim() ? m.nickname : m.username,
-                username: m.username,
-                nickname: m.nickname,
-                email: m.email,
-                status: m.status || "ACTIVE",
-                profileImageUrl: m.profileImageUrl || "",
-                role: m.role === "ORGANIZER" ? "LEADER" : "MEMBER",
-                isFollowing: m.isFollowing,
-            }));
-            setMembers(formattedMembers);
-            console.log("🔄 멤버 목록 갱신 완료:", formattedMembers.length, "명");
-        } catch (e) {
-            console.error("멤버 목록 갱신 실패:", e);
+          updateUnreadCount(targetId, unread);
+          return;
         }
+
+        // ✅ 2) READ 시그널 종료
+        if (type === "READ") return;
+
+        // ✅ 3) messageId 없으면 종료
+        if (!newMsg?.messageId) return;
+
+        // ✅ 4) 빈 메시지 무시 (type 기준으로만!)
+        const ALLOW_EMPTY = new Set([
+          "UNREAD_UPDATE",
+          "IMAGE",
+          "POLL",
+          "BILL",
+          "LOCATION",
+          "VOTE",
+          "BILL_UPDATE",
+          "VOTE_UPDATE",
+          "NOTICE",
+        ]);
+
+        if (!String(newMsg?.content ?? "").trim() && !ALLOW_EMPTY.has(type)) {
+          console.warn("⚠️ 빈 메시지 무시", { type, rawType: newMsg?.type });
+          debugType("❌ empty-check type", type);
+          return;
+        }
+
+        // ✅ 5) BILL_UPDATE도 type으로만 판단
+        if (type === "BILL_UPDATE") {
+          const targetId = Number(
+            newMsg?.targetMessageId || newMsg?.metadata?.messageId,
+          );
+          if (!targetId) return;
+
+          addMessage({
+            ...newMsg,
+            messageId: targetId,
+            type: "BILL",
+            metadata:
+              typeof newMsg?.metadata === "string"
+                ? JSON.parse(newMsg.metadata)
+                : newMsg?.metadata,
+          });
+          return;
+        }
+
+        // ✅ 6) NOTICE
+        if (type === "NOTICE") {
+          setTimeout(fetchRoomMembers, 500);
+        }
+
+        // ❌ 7) 자동 READ 처리 완전 제거!
+        // if (currentUser && newMsg?.email !== currentUser.email) {
+        //   if (
+        //     ["TALK", "TEXT", "IMAGE", "LOCATION", "POLL", "VOTE"].includes(type)
+        //   ) {
+        //     chatApi.markAsRead(Number(roomId));
+        //   }
+        // }
+
+        // ✅ 8) validatedMsg에도 type은 정규화 값으로 박기
+        console.log("🔍 메시지 생성 전:", {
+          rawUnreadCount: newMsg?.unreadCount,
+          parsedUnreadCount: Number(newMsg?.unreadCount ?? 0),
+          messageId: newMsg?.messageId,
+          type: type,
+        });
+
+        const validatedMsg: ChatMessage = {
+          ...newMsg,
+          type: type as ChatMessage["type"],
+          unreadCount: Number(newMsg?.unreadCount ?? 0),
+          senderNickname: newMsg?.senderNickname || "사용자",
+          sentAt: newMsg?.sentAt || new Date().toISOString(),
+          senderId: Number(newMsg?.senderId),
+          messageId: Number(newMsg?.messageId),
+          metadata:
+            typeof newMsg?.metadata === "string"
+              ? JSON.parse(newMsg.metadata)
+              : newMsg?.metadata,
+        };
+
+        console.log("✅ validatedMsg 생성 완료:", {
+          messageId: validatedMsg.messageId,
+          unreadCount: validatedMsg.unreadCount,
+        });
+
+        addMessage(validatedMsg);
+      });
+    }
+
+    return () => {
+      console.log("🧹 컴포넌트 정리 시작");
+      isSubscribed = false;
+
+      // ✅ 1. READ 처리
+      if (roomId && currentUser) {
+        chatApi.markAsRead(Number(roomId));
+        console.log("✅ cleanup에서 READ 신호 전송");
+      }
+
+      // ✅ 2. LEAVE 신호 포함한 disconnect
+      setTimeout(() => {
+        chatApi.disconnect(Number(roomId)); // ✅ roomId 전달
+        console.log("✅ WebSocket 연결 해제");
+      }, 150);
     };
+  }, [roomId, currentUser]);
+
+  useEffect(() => {
+    console.log(
+      "📊 현재 messages 상태:",
+      messages.map((m) => ({
+        id: m.messageId,
+        content: m.content.substring(0, 20),
+        unreadCount: m.unreadCount,
+      })),
+    );
+  }, [messages]);
+
+  const fetchRoomMembers = async () => {
+    if (!roomId) return;
+    try {
+      const rawMembers = await chatApi.getRoomMembers(Number(roomId));
+      const formattedMembers: User[] = rawMembers.map((m: any) => ({
+        id: m.userId,
+        userId: m.userId,
+        name: m.nickname?.trim() ? m.nickname : m.username,
+        username: m.username,
+        nickname: m.nickname,
+        email: m.email,
+        status: m.status || "ACTIVE",
+        profileImageUrl: m.profileImageUrl || "",
+        role: m.role === "ORGANIZER" ? "LEADER" : "MEMBER",
+        isFollowing: m.isFollowing,
+      }));
+      setMembers(formattedMembers);
+      console.log("🔄 멤버 목록 갱신 완료:", formattedMembers.length, "명");
+    } catch (e) {
+      console.error("멤버 목록 갱신 실패:", e);
+    }
+  };
 
   const handleEditMeeting = () => {
     if (!linkedMeetingId) {
@@ -465,6 +705,7 @@ const ChatRoomPage: React.FC = () => {
       toast.error("로그인 세션이 만료되었습니다.");
       return;
     }
+
     chatApi.sendMessage(
       Number(roomId),
       currentUser.email,
@@ -474,9 +715,13 @@ const ChatRoomPage: React.FC = () => {
       {},
     );
 
+    // ❌ 제거: 불필요한 READ 신호
+    // setTimeout(() => {
+    //     chatApi.markAsRead(Number(roomId));
+    // }, 100);
+
     setInputValue("");
   };
-
   const handleFeatureAction = (feature: string) => {
     if (!roomId || !currentUser?.email) return;
 
@@ -491,15 +736,12 @@ const ChatRoomPage: React.FC = () => {
         setActiveModal("BILL");
         break;
       case "📍":
-        chatApi.sendMessage(
-          Number(roomId),
-          currentUser.email,
-          currentUser.userId,
-          "📍 모임 장소 확인하세요.",
-          "LOCATION",
-          { placeName: "여의도 한강공원", lat: 37.5271, lng: 126.9328 },
-        );
-        toast.success("장소 정보를 전송했습니다.");
+        if (recommendedPlaces.length === 0) {
+          toast.error("먼저 'AI 추천 받기'를 눌러 장소를 분석해 주세요!");
+          return;
+        }
+        // ✅ prompt 대신 우리가 만든 이쁜 모달을 띄웁니다.
+        setIsPlaceModalOpen(true);
         break;
     }
   };
@@ -521,9 +763,15 @@ const ChatRoomPage: React.FC = () => {
 
   const handleReportSubmit = async (reason: string) => {
     if (!reportTarget) return;
-    console.log(`${reportTarget.name}님 신고 접수: ${reason}`);
-    toast.success("신고가 정상적으로 접수되었습니다.");
-    setReportTarget(null);
+    try {
+      // ✅ chatApi를 사용하여 서버에 신고 접수
+      await chatApi.reportUser(reportTarget.id, reason);
+      toast.success("신고가 정상적으로 접수되었습니다.");
+      setReportTarget(null);
+    } catch (error) {
+      toast.error("신고 접수 중 오류가 발생했습니다.");
+      console.error("신고 실패:", error);
+    }
   };
 
   const scrollToBottom = () => {
@@ -570,13 +818,68 @@ const ChatRoomPage: React.FC = () => {
             </div>
           )}
           <div className={`message-row ${isMine ? "mine" : "others"}`}>
-            <ChatMessageItem message={msg} isMine={isMine} />
+            <ChatMessageItem
+              message={msg}
+              isMine={isMine}
+              onLocationClick={handleLocationClick}
+            />
           </div>
         </React.Fragment>
       );
     });
   };
+  useEffect(() => {
+    // 🚨 maps 객체와 생성자가 존재하는지 엄격히 체크
+    if (
+      isMapModalOpen &&
+      selectedMapPlace &&
+      window.kakao &&
+      window.kakao.maps
+    ) {
+      // 카카오 지도 라이브러리가 완전히 로드될 때까지 대기
+      window.kakao.maps.load(() => {
+        const container = document.getElementById("kakao-map");
+        if (!container) return;
 
+        try {
+          const options = {
+            center: new window.kakao.maps.LatLng(
+              selectedMapPlace.lat,
+              selectedMapPlace.lng,
+            ),
+            level: 3,
+          };
+
+          const map = new window.kakao.maps.Map(container, options);
+
+          // 마커 표시
+          const markerPosition = new window.kakao.maps.LatLng(
+            selectedMapPlace.lat,
+            selectedMapPlace.lng,
+          );
+          const marker = new window.kakao.maps.Marker({
+            position: markerPosition,
+          });
+          marker.setMap(map);
+
+          // 인포윈도우(장소명) 표시
+          const iwContent = `<div style="padding:5px; font-size:12px; text-align:center;">${selectedMapPlace.placeName}</div>`;
+          const infowindow = new window.kakao.maps.InfoWindow({
+            content: iwContent,
+          });
+          infowindow.open(map, marker);
+        } catch (error) {
+          console.error("지도 생성 중 오류 발생:", error);
+        }
+      });
+    }
+  }, [isMapModalOpen, selectedMapPlace]);
+
+  // 3. 메시지 클릭 핸들러 (LOCATION 타입 메시지용)
+  const handleLocationClick = (metadata: any) => {
+    setSelectedMapPlace(metadata);
+    setIsMapModalOpen(true);
+  };
   const handleEditNotice = async () => {
     if (!isOrganizer) {
       toast.error("방장만 공지사항을 수정할 수 있습니다.");
@@ -595,23 +898,47 @@ const ChatRoomPage: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    console.log(
+      "📊 현재 messages 상태:",
+      messages.map((m) => ({
+        id: m.messageId,
+        content: m.content.substring(0, 20),
+        unreadCount: m.unreadCount,
+      })),
+    );
+  }, [messages]);
+
   return (
     <div className="chat-room-container">
       <header className="header">
         <div className="header-content">
           <button
             className="back-btn"
-            onClick={() => navigate("/")}
+            onClick={() => {
+              if (roomId && currentUser) {
+                chatApi.markAsRead(Number(roomId));
+                console.log("✅ 뒤로가기에서 READ 신호 전송");
+              }
+              // ✅ disconnect에 roomId 전달
+              setTimeout(() => {
+                chatApi.disconnect(Number(roomId));
+              }, 100);
+              navigate("/");
+            }}
             style={{ cursor: "pointer" }}
           >
             ←
           </button>
+
           <div className="header-info">
             <div className="room-title">🌅 {roomTitle}</div>
             <div className="room-meta">{members.length}명 참여중</div>
           </div>
           <div className="header-actions">
-            <button className="icon-btn">🔔</button>
+            <div className="chat-notification-wrapper">
+              <NotificationBell />
+            </div>
             <button className="icon-btn" onClick={() => setIsMenuOpen(true)}>
               ☰
             </button>
@@ -631,12 +958,12 @@ const ChatRoomPage: React.FC = () => {
       <div
         className="ai-recommendation-banner"
         style={{
-            background: "linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)",
-            color: "white",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+          background: "linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)",
+          color: "white",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -646,7 +973,7 @@ const ChatRoomPage: React.FC = () => {
           </span>
         </div>
         <button
-          onClick={showAIRecommendation}
+          onClick={handleAIButtonClick}
           style={{
             backgroundColor: "rgba(255,255,255,0.2)",
             border: "1px solid rgba(255,255,255,0.4)",
@@ -727,6 +1054,107 @@ const ChatRoomPage: React.FC = () => {
           ➤
         </button>
       </footer>
+      {isPlaceModalOpen && (
+        <div
+          className="modal-overlay"
+          onClick={() => setIsPlaceModalOpen(false)}
+        >
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: "15px",
+              }}
+            >
+              <h3 style={{ margin: 0 }}>📍 추천 장소 선택</h3>
+              <button
+                onClick={() => setIsPlaceModalOpen(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: "1.5rem",
+                  cursor: "pointer",
+                  color: "#999",
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <p
+              style={{
+                fontSize: "0.85rem",
+                color: "#666",
+                marginBottom: "15px",
+              }}
+            >
+              채팅방에 공유할 장소를 선택해주세요.
+            </p>
+
+            <div
+              className="place-list"
+              style={{
+                maxHeight: "350px",
+                overflowY: "auto",
+                display: "flex",
+                flexDirection: "column",
+                gap: "10px",
+              }}
+            >
+              {recommendedPlaces.map((place, idx) => (
+                <div
+                  key={idx}
+                  className="place-item"
+                  onClick={() => sendLocationMessage(place)} // 👈 여기서 sendLocationMessage 사용
+                  style={{
+                    padding: "15px",
+                    border: "1px solid #eee",
+                    borderRadius: "12px",
+                    cursor: "pointer",
+                    transition: "all 0.2s",
+                    textAlign: "left",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontWeight: "bold",
+                      color: "#333",
+                      fontSize: "1rem",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    {place.placeName}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: "0.8rem",
+                      color: "#888",
+                      lineHeight: "1.4",
+                    }}
+                  >
+                    {place.address}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button
+              className="submit-btn"
+              style={{
+                background: "#f1f3f5",
+                color: "#495057",
+                marginTop: "20px",
+                width: "100%",
+              }}
+              onClick={() => setIsPlaceModalOpen(false)}
+            >
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ✅ 정산 입력 모달 */}
       {activeModal === "BILL" && (
@@ -744,7 +1172,6 @@ const ChatRoomPage: React.FC = () => {
           onSubmit={(data: PollData) => handleFeatureSubmit("POLL", data)}
         />
       )}
-
       {isMenuOpen && (
         <>
           <div
@@ -828,6 +1255,158 @@ const ChatRoomPage: React.FC = () => {
           onClose={() => setReportTarget(null)}
           onSubmit={handleReportSubmit}
         />
+      )}
+      {isChoiceModalOpen && (
+        <div
+          className="modal-overlay"
+          onClick={() => setIsChoiceModalOpen(false)}
+        >
+          <div
+            className="modal-content"
+            style={{ maxWidth: "350px", textAlign: "center" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 style={{ marginBottom: "15px" }}>🤖 AI 장소 추천</h3>
+            <p style={{ color: "#666", marginBottom: "25px" }}>
+              이전에 추천받은 장소 목록이 있습니다.
+              <br />
+              어떻게 하시겠습니까?
+            </p>
+
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+            >
+              <button
+                onClick={() => {
+                  setIsChoiceModalOpen(false);
+                  setIsPlaceModalOpen(true); // 이전 목록 모달 열기
+                  toast.success("이전 추천 리스트를 불러왔습니다.");
+                }}
+                style={{
+                  padding: "12px",
+                  borderRadius: "8px",
+                  border: "1px solid #ddd",
+                  background: "white",
+                  cursor: "pointer",
+                  fontWeight: "bold",
+                  color: "#333",
+                }}
+              >
+                📂 이전 목록 보기
+              </button>
+
+              <button
+                onClick={fetchNewRecommendations} // 새로 API 호출
+                style={{
+                  padding: "12px",
+                  borderRadius: "8px",
+                  border: "none",
+                  background:
+                    "linear-gradient(90deg, #6a11cb 0%, #2575fc 100%)",
+                  cursor: "pointer",
+                  fontWeight: "bold",
+                  color: "white",
+                }}
+              >
+                ✨ 새로 추천 받기
+              </button>
+            </div>
+
+            <button
+              onClick={() => setIsChoiceModalOpen(false)}
+              style={{
+                marginTop: "15px",
+                background: "none",
+                border: "none",
+                color: "#999",
+                cursor: "pointer",
+                textDecoration: "underline",
+              }}
+            >
+              취소
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ 지도 상세 확인 모달 */}
+      {isMapModalOpen && selectedMapPlace && (
+        <div className="modal-overlay" onClick={() => setIsMapModalOpen(false)}>
+          <div
+            className="modal-content"
+            style={{ maxWidth: "450px", width: "90%" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                marginBottom: "15px",
+              }}
+            >
+              <h3 style={{ margin: 0 }}>📍 장소 상세 정보</h3>
+              <button
+                onClick={() => setIsMapModalOpen(false)}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: "1.2rem",
+                  cursor: "pointer",
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            {/* 지도 영역 */}
+            <div
+              id="kakao-map"
+              style={{
+                width: "100%",
+                height: "300px",
+                borderRadius: "12px",
+                background: "#eee",
+              }}
+            ></div>
+
+            <div style={{ marginTop: "15px", textAlign: "left" }}>
+              <div style={{ fontWeight: "bold", fontSize: "1.1rem" }}>
+                {selectedMapPlace.placeName}
+              </div>
+              <div
+                style={{ color: "#666", fontSize: "0.9rem", marginTop: "4px" }}
+              >
+                {selectedMapPlace.address}
+              </div>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+              <button
+                className="submit-btn"
+                onClick={() =>
+                  window.open(
+                    `https://map.kakao.com/link/to/${selectedMapPlace.placeName},${selectedMapPlace.lat},${selectedMapPlace.lng}`,
+                  )
+                }
+                style={{
+                  flex: 1,
+                  background: "#fee500",
+                  color: "#3c1e1e",
+                  border: "none",
+                }}
+              >
+                카카오맵 길찾기
+              </button>
+              <button
+                className="submit-btn"
+                onClick={() => setIsMapModalOpen(false)}
+                style={{ flex: 0.5, background: "#f1f3f5", color: "#495057" }}
+              >
+                닫기
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

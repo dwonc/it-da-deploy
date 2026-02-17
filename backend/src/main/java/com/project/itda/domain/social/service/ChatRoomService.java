@@ -1,10 +1,7 @@
 package com.project.itda.domain.social.service;
 
-import com.project.itda.domain.meeting.entity.Meeting;
 import com.project.itda.domain.meeting.repository.MeetingRepository;
 import com.project.itda.domain.notification.service.NotificationService; // ✅ 알림 서비스 임포트 확인
-import com.project.itda.domain.participation.entity.Participation;
-import com.project.itda.domain.participation.enums.ParticipationStatus;
 import com.project.itda.domain.participation.repository.ParticipationRepository;
 import com.project.itda.domain.participation.service.ParticipationService;
 import com.project.itda.domain.social.dto.response.ChatParticipantResponse;
@@ -18,8 +15,10 @@ import com.project.itda.domain.social.repository.ChatRoomRepository;
 import com.project.itda.domain.user.entity.User;
 import com.project.itda.domain.user.repository.UserFollowRepository;
 import com.project.itda.domain.user.repository.UserRepository;
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.messaging.simp.SimpMessageSendingOperations;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -43,28 +42,18 @@ public class ChatRoomService {
     private final UserFollowRepository userFollowRepository;
     private final ParticipationService participationService;
     private final NotificationService notificationService; // ✅ 알림 서비스 의존성 주입
+    private final SimpMessageSendingOperations messagingTemplate;
 
+    // ✅ 채팅방별 활성 사용자 추적 (roomId -> Set<email>)
+    private final Map<Long, Set<String>> activeUsers = new ConcurrentHashMap<>();
     // 실시간 접속자 관리
     private final Map<Long, Set<String>> connectedUsers = new ConcurrentHashMap<>();
+
+    private final Map<Long, Set<String>> activeUsersInRoom = new ConcurrentHashMap<>();
 
     // 현재 방에 접속 중인 인원수 반환
     public int getConnectedCount(Long roomId) {
         return connectedUsers.getOrDefault(roomId, new HashSet<>()).size();
-    }
-
-    // 유저가 방에 입장했을 때
-    public void userJoined(Long roomId, String email) {
-        connectedUsers.computeIfAbsent(roomId, k -> ConcurrentHashMap.newKeySet()).add(email);
-    }
-
-    // 유저가 방에서 나갔을 때
-    public void userLeft(Long roomId, String email) {
-        if (connectedUsers.containsKey(roomId)) {
-            connectedUsers.get(roomId).remove(email);
-            if (connectedUsers.get(roomId).isEmpty()) {
-                connectedUsers.remove(roomId);
-            }
-        }
     }
 
     @Transactional
@@ -150,14 +139,6 @@ public class ChatRoomService {
                             .build();
                 })
                 .collect(Collectors.toList());
-    }
-
-    @Transactional
-    public void updateLastReadAt(Long roomId, String email) {
-        Optional<ChatParticipant> participantOpt = chatParticipantRepository.findByChatRoomIdAndUserEmail(roomId, email);
-        if (participantOpt.isPresent()) {
-            participantOpt.get().updateLastReadAt(LocalDateTime.now());
-        }
     }
 
     @Transactional
@@ -306,7 +287,7 @@ public class ChatRoomService {
                 .user(user)
                 .role(ChatRole.MEMBER)
                 .joinedAt(LocalDateTime.now())
-                .lastReadAt(LocalDateTime.now())
+                .lastReadAt(null)   // ✅ 여기
                 .build();
         chatParticipantRepository.save(participant);
 
@@ -314,5 +295,93 @@ public class ChatRoomService {
         if (room.getMeetingId() != null) {
             participationService.approveParticipationFromInvite(room.getMeetingId(), user);
         }
+    }
+    @Transactional
+    public void updateLastReadAt(Long roomId, String email) {
+        // findByChatRoomIdAndUserEmail 반환값(Optional)을 이용하여 처리
+        chatParticipantRepository.findByChatRoomIdAndUserEmail(roomId, email)
+                .ifPresentOrElse(
+                        participant -> {
+                            // 1. DB 업데이트
+                            participant.updateLastReadAt(java.time.LocalDateTime.now());
+
+                            // 2. 실시간 읽음 처리 신호(READ) 전송
+                            Map<String, Object> readSignal = new HashMap<>();
+                            readSignal.put("type", "READ");
+                            readSignal.put("roomId", roomId);
+                            readSignal.put("senderId", participant.getUser().getUserId());
+                            readSignal.put("email", email); // 프론트에서 내 메시지인지 구분하기 위해 추가하면 좋음
+
+                            messagingTemplate.convertAndSend("/topic/room/" + roomId, readSignal);
+                        },
+                        () -> {
+                            // 3. 참여자가 아닐 경우 에러 대신 로그 출력 (서버 중단 방지)
+                            // 모임에서 나갔거나, 데이터가 비동기화된 경우일 수 있음
+                            // log.warn("⚠️ 읽음 처리 무시: 참여자 정보 없음 (roomId={}, email={})", roomId, email);
+                            System.out.println("⚠️ 읽음 처리 무시: 참여자 정보 없음. roomId=" + roomId + ", email=" + email);
+                        }
+                );
+    }
+
+    // 사용자가 채팅방에 입장
+    public void userJoined(Long roomId, String email) {
+        // lastReadAt 업데이트
+        ChatParticipant participant = chatParticipantRepository
+                .findByChatRoomIdAndUserEmail(roomId, email)
+                .orElseThrow();
+        participant.updateLastReadAt(LocalDateTime.now());
+        chatParticipantRepository.save(participant);
+
+        // ✅ 활성 사용자 목록에 추가
+        activeUsers.computeIfAbsent(roomId, k -> ConcurrentHashMap.newKeySet()).add(email);
+        log.info("✅ 사용자 입장: roomId={}, email={}, 현재 활성: {}",
+                roomId, email, activeUsers.get(roomId).size());
+    }
+
+    // 사용자가 채팅방에서 퇴장
+    public void userLeft(Long roomId, String email) {
+        Set<String> users = activeUsers.get(roomId);
+        if (users != null) {
+            users.remove(email);
+            log.info("👋 사용자 퇴장: roomId={}, email={}, 남은 활성: {}",
+                    roomId, email, users.size());
+        }
+    }
+
+    // ✅ 활성 사용자 이메일 목록
+    public Set<String> getActiveUserEmails(Long roomId) {
+        return activeUsers.getOrDefault(roomId, Collections.emptySet());
+    }
+
+    // ✅ 활성 사용자 수 조회
+    public int getActiveUserCount(Long roomId) {
+        Set<String> users = activeUsers.get(roomId);
+        return users != null ? users.size() : 0;
+    }
+
+    public boolean isUserActive(Long roomId, String email) {
+        Set<String> users = activeUsersInRoom.get(roomId);
+        return users != null && users.contains(email);
+    }
+    // 현재 채팅방에 활성 중인 사용자 목록 (최근 5초 이내 활동)
+    public Set<Long> getActiveUserIds(Long roomId) {
+        LocalDateTime recentTime = LocalDateTime.now().minusSeconds(5);
+
+        return chatParticipantRepository.findByChatRoomId(roomId).stream()
+                .filter(p -> p.getLastReadAt() != null && p.getLastReadAt().isAfter(recentTime))
+                .map(p -> p.getUser().getUserId())
+                .collect(Collectors.toSet());
+    }
+
+    // ✅ 디버깅용: 특정 방의 activeUsers 초기화
+    public void clearActiveUsers(Long roomId) {
+        activeUsers.remove(roomId);
+        log.info("✅ activeUsers 초기화 완료: roomId={}", roomId);
+    }
+
+    @PostConstruct
+    public void init() {
+        activeUsers.clear();
+        log.info("✅ 모든 activeUsers 초기화 완료");
     }
 }

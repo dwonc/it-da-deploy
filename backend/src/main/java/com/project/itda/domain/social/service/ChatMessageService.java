@@ -14,6 +14,7 @@ import com.project.itda.domain.social.repository.ChatRoomRepository;
 import com.project.itda.domain.user.entity.User;
 import com.project.itda.domain.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -21,12 +22,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
@@ -36,6 +35,7 @@ public class ChatMessageService {
     private final ChatRoomRepository chatRoomRepository;
     private final ChatParticipantRepository chatParticipantRepository;
     private final ApplicationEventPublisher eventPublisher;  // ⭐ 추가!
+    private final ChatRoomService chatRoomService;
 
     public List<ChatMessage> getMessagesByRoom(Long roomId) {
         return chatMessageRepository.findByChatRoomIdOrderByCreatedAtAsc(roomId);
@@ -43,26 +43,24 @@ public class ChatMessageService {
 
     @Transactional
     public ChatMessage saveMessage(String email, Long chatRoomId, String content, MessageType type, int unreadCount) {
-        // 1. 보낸 사람 조회
         User sender = userRepository.findByEmail(email)
                 .orElseThrow();
 
-        // 2. 채팅방 조회
         ChatRoom room = chatRoomRepository.findById(chatRoomId)
                 .orElseThrow();
 
-        // 3. 메시지 엔티티 생성 및 저장
+        // ❌ 여기서 unreadCount를 0으로 고정하지 말고, 계산해서 넣어야 함!
         ChatMessage message = ChatMessage.builder()
                 .sender(sender)
                 .chatRoom(room)
                 .content(content)
                 .type(type)
-                .unreadCount(unreadCount)
+                .unreadCount(unreadCount)  // ✅ 이 값이 항상 0으로 들어옴
                 .build();
 
         ChatMessage saved = chatMessageRepository.save(message);
 
-        // ⭐ 4. 배지 이벤트 발행! (채팅 전송 시)
+        // ⭐ 배지 이벤트 발행
         int totalChatCount = chatMessageRepository.countBySenderUserId(sender.getUserId());
         eventPublisher.publishEvent(new ChatSentEvent(sender.getUserId(), totalChatCount));
 
@@ -105,14 +103,7 @@ public class ChatMessageService {
         }).collect(Collectors.toList());
     }
 
-    @Transactional
-    public void updateLastReadAt(Long roomId, String email) {
-        com.project.itda.domain.social.entity.ChatParticipant participant =
-                chatParticipantRepository.findByChatRoomIdAndUserEmail(roomId, email)
-                        .orElseThrow(() -> new RuntimeException("참여자가 아닙니다."));
 
-        participant.updateLastReadAt(java.time.LocalDateTime.now());
-    }
 
     @Transactional
     public ChatMessage saveMessageWithMetadata(String email, Long chatRoomId, String content, MessageType type, Map<String, Object> metadata, int unreadCount) {
@@ -203,4 +194,29 @@ public class ChatMessageService {
                 .map(msg -> msg.getChatRoom().getId())
                 .orElseThrow(() -> new RuntimeException("해당 메시지가 속한 채팅방을 찾을 수 없습니다."));
     }
+
+
+    /**
+     * ✅ 특정 메시지의 현재 unreadCount를 동적으로 계산
+     * 메시지 생성 시각보다 lastReadAt이 이전인 참여자 수
+     */
+    @Transactional(readOnly = true)
+    public int calculateUnreadCount(Long roomId, Long messageId) {
+        ChatMessage message = chatMessageRepository.findById(messageId)
+                .orElseThrow(() -> new IllegalArgumentException("메시지를 찾을 수 없습니다"));
+
+        // ✅ 발송자 제외하고 계산
+        long unreadCount = chatParticipantRepository.countUnreadExcludingSender(
+                roomId,
+                message.getSender().getUserId(),
+                message.getCreatedAt()
+        );
+
+        log.debug("📊 unreadCount 계산 - roomId: {}, messageId: {}, unreadCount: {}",
+                roomId, messageId, unreadCount);
+
+        return (int) unreadCount;
+    }
+
+
 }

@@ -1,5 +1,8 @@
 // components/common/SafeImage.tsx
-const API_ORIGIN = import.meta.env.VITE_API_ORIGIN ?? "http://localhost:8080";
+const API_ORIGIN =
+  import.meta.env.VITE_API_ORIGIN ??
+  import.meta.env.VITE_API_URL ??
+  "http://localhost:8080";
 
 const toAbsUrl = (url?: string) => {
   if (!url) return "";

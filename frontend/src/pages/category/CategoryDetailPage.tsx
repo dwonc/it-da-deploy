@@ -2,6 +2,9 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMeetingStore } from "@/stores/useMeetingStore";
+import { useUIStore } from "@/stores/useUIStore";
+import ChatRoomListModal from "@/pages/chat/ChatRoomListModal";
+
 import {
   categoryAPI,
   type CategoryDetailStats,
@@ -10,7 +13,10 @@ import {
 import { CategoryType } from "@/types/category.types";
 import "./CategoryDetailPage.css";
 
-const API_ORIGIN = import.meta.env.VITE_API_ORIGIN ?? "http://localhost:8080";
+const API_ORIGIN =
+  import.meta.env.VITE_API_ORIGIN ??
+  import.meta.env.VITE_API_URL ??
+  "http://localhost:8080";
 
 const toAbsUrl = (url?: string) => {
   if (!url) return "";
@@ -190,6 +196,9 @@ const CategoryDetailPage = () => {
   const { category } = useParams<{ category: string }>();
   const navigate = useNavigate();
 
+  const { isChatListModalOpen, openChatListModal, closeChatListModal } =
+    useUIStore();
+
   const { meetings, isLoading, fetchMeetingsByCategory } = useMeetingStore();
 
   const categoryName = decodeURIComponent(category || "") as CategoryType;
@@ -303,9 +312,9 @@ const CategoryDetailPage = () => {
             <a href="/meetings" className="nav-item">
               모임 찾기
             </a>
-            <a href="/chat" className="nav-item">
+            <div className="nav-item" onClick={openChatListModal}>
               모임톡
-            </a>
+            </div>
             <a href="/mypage" className="nav-item">
               마이페이지
             </a>
@@ -455,6 +464,10 @@ const CategoryDetailPage = () => {
           )}
         </div>
       </div>
+      <ChatRoomListModal
+        isOpen={isChatListModalOpen}
+        onClose={closeChatListModal}
+      />
     </div>
   );
 };

@@ -19,7 +19,10 @@ interface ChatRoomGridProps {
   meetings?: Meeting[];
 }
 
-const API_ORIGIN = import.meta.env.VITE_API_ORIGIN ?? "http://localhost:8080";
+const API_ORIGIN =
+  import.meta.env.VITE_API_ORIGIN ??
+  import.meta.env.VITE_API_URL ??
+  "http://localhost:8080";
 
 const toAbsUrl = (url?: string) => {
   if (!url) return "";
@@ -29,7 +32,7 @@ const toAbsUrl = (url?: string) => {
 
 const withFallback = (
   e: React.SyntheticEvent<HTMLImageElement>,
-  fallback: string
+  fallback: string,
 ) => {
   const img = e.currentTarget;
   if (img.dataset.fallbackApplied === "1") return; // ✅ 2번 이상 실행 방지

@@ -9,7 +9,7 @@ import {
 } from "../../hooks/auth/useProfileWebSocket";
 import "./components/MyMeetings.css";
 
-const API_ORIGIN = "http://localhost:8080";
+const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 const DEFAULT_IMAGE =
   "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=400&q=80";
 

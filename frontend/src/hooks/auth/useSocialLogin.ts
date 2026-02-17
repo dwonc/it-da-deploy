@@ -2,48 +2,47 @@ import { useAuthStore } from "@/stores/useAuthStore.ts";
 import { useCallback } from "react";
 import axios from "axios";
 
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
+
 export const useSocialLogin = () => {
   const { setSocialUser } = useAuthStore();
-  const sleep = (ms: number) =>
-    new Promise((resolve) => setTimeout(resolve, ms));
 
   const handleCallback = useCallback(async (): Promise<void> => {
-    const maxRetries = 15;
-    console.log("🔄 OAuth2 세션 확인 루프 시작");
+    const maxRetries = 10; // 20초 (2초 × 10)
+    console.log("🔄 OAuth2 세션 확인 시작");
 
     for (let i = 1; i <= maxRetries; i++) {
       try {
-        const response = await axios.get(
-          "http://localhost:8080/api/auth/session",
-          {
-            withCredentials: true,
-            headers: {
-              "Cache-Control": "no-cache",
-              Pragma: "no-cache",
-            },
-          }
-        );
+        console.log(`⏳ [${i}/${maxRetries}] 세션 확인 중...`);
+
+        const response = await axios.get(`${API_BASE_URL}/api/auth/session`, {
+          withCredentials: true,
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
+        });
 
         if (response.data?.userId) {
           console.log("✅ 세션 확인 성공!", response.data);
 
-          // ✅ 성향 데이터 확인 후 리다이렉트
+          // ✅ Zustand 스토어에 사용자 정보 저장
+          setSocialUser(response.data);
+
+          // ✅ 성향 데이터 확인
           try {
             await axios.get(
-              `http://localhost:8080/api/users/${response.data.userId}/preferences`,
-              { withCredentials: true }
+              `${API_BASE_URL}/api/users/${response.data.userId}/preferences`,
+              { withCredentials: true },
             );
-            // 성향 데이터 있음 → 메인으로
+
             console.log("✅ 성향 데이터 존재 - 메인으로 이동");
-            setSocialUser(response.data);
             window.location.href = "/";
-          } catch (prefError) {
+          } catch (prefError: any) {
             const errorStatus = prefError.response?.status;
 
             if (errorStatus === 404 || errorStatus === 500) {
-              // 성향 데이터 없음 → 설정 페이지로
               console.log("⚠️ 성향 데이터 없음 - 설정 페이지로 이동");
-              setSocialUser(response.data);
               window.location.href = "/user-preference/setup";
             } else {
               throw prefError;
@@ -52,21 +51,22 @@ export const useSocialLogin = () => {
           return;
         }
       } catch (error: any) {
-        const isAuthError = error.response?.status === 401;
-        const isNetworkError = error.message === "Network Error";
+        const status = error.response?.status;
 
-        if ((isAuthError || isNetworkError) && i < maxRetries) {
-          console.warn(
-            `⏳ [${i}/${maxRetries}] 세션 확인 대기 중 (CORS/401)...`
-          );
-          await sleep(2000);
+        if (status === 401 && i < maxRetries) {
+          console.warn(`⏳ [${i}/${maxRetries}] 세션 확인 대기 중 (401)...`);
+          await new Promise((resolve) => setTimeout(resolve, 2000)); // 2초 대기
           continue;
         }
-        console.error("❌ 치명적 로그인 에러:", error);
+
+        console.error("❌ 세션 확인 실패:", error);
         break;
       }
     }
-    throw new Error("로그인 세션 확인 최종 실패");
+
+    console.error("❌ 로그인 세션 확인 최종 실패");
+    alert("로그인에 실패했습니다. 다시 시도해주세요.");
+    window.location.href = "/login";
   }, [setSocialUser]);
 
   return { handleCallback };

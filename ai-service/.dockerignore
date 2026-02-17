@@ -1,0 +1,8 @@
+# KcELECTRA 모델만 제외
+models/kcelectra_sentiment_with_typo/
+
+# 기타
+__pycache__/
+*.pyc
+.env
+*.log

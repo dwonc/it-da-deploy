@@ -105,9 +105,6 @@ class SatisfactionRequest(BaseModel):
     meeting_rating_count: int = 0
     meeting_participant_count: int = 0
 
-class SentimentRequest(BaseModel):
-    text: str
-
 class CentroidRequest(BaseModel):
     user_locations: List[Dict[str, float]]
 
@@ -514,10 +511,6 @@ async def get_models_info():
             "regressor_loaded": model_loader.regressor.is_loaded() if model_loader.regressor else False,
             "feature_count": len(model_loader.feature_builder.get_feature_names()) if model_loader.feature_builder else 0
         } if (model_loader.ranker or model_loader.regressor) else {},
-        "kcelectra": {
-            "loaded": model_loader.kcelectra.is_loaded() if model_loader.kcelectra else False,
-            "device": model_loader.kcelectra.device if model_loader.kcelectra else "unknown"
-        } if model_loader.kcelectra else {}
     }
 
 # ========================================
@@ -682,27 +675,6 @@ async def predict_satisfaction_post(request: SatisfactionRequest):
             "reasons": []
         }
 
-
-# ========================================
-# 감성 분석
-# ========================================
-
-@router.post("/sentiment")
-async def analyze_sentiment(request: SentimentRequest):
-    """
-    KcELECTRA 감성 분석
-    POST /api/ai/recommendations/sentiment
-    """
-    try:
-        if not model_loader.kcelectra or not model_loader.kcelectra.is_loaded():
-            raise HTTPException(status_code=503, detail="KcELECTRA 모델이 로드되지 않았습니다")
-
-        result = model_loader.kcelectra.predict(request.text)
-        return result
-
-    except Exception as e:
-        logger.error(f"감성 분석 실패: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
 
 # ========================================
 # 중간지점 계산

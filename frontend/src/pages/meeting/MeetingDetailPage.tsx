@@ -83,7 +83,7 @@ const MeetingDetailPage = () => {
   const [isManageModalOpen, setIsManageModalOpen] = useState(false);
   const [isPreviewModalOpen, setIsPreviewModalOpen] = useState(false);
 
-  const API_ORIGIN = "http://localhost:8080";
+  const API_ORIGIN = import.meta.env.VITE_API_URL ?? "http://localhost:8080";
 
   // ✅ 최근 조회 모임 localStorage에 저장하는 함수
   const saveToRecentViewed = (meetingData: MeetingDetail) => {
@@ -173,9 +173,7 @@ const MeetingDetailPage = () => {
 
       let meetingData = response.data;
 
-      // ✅ 최근 조회 모임 localStorage에 저장
-      saveToRecentViewed(meetingData);
-
+      // [수정 1] 참여자 정보가 없으면 먼저 가져옵니다. (순서를 위로 올림)
       if (!meetingData.participants || meetingData.participants.length === 0) {
         try {
           const participantsRes = await axios.get(
@@ -192,6 +190,9 @@ const MeetingDetailPage = () => {
             participantsList = participantsRes.data.participants;
           }
 
+          // 주의: 여기서 APPROVED만 필터링하면 PENDING 상태인 본인을 찾지 못할 수 있습니다.
+          // UI 표시용으로는 APPROVED만 필요할 수 있으나, 본인 확인용으로는 전체가 필요할 수 있습니다.
+          // 일단 기존 로직(APPROVED만 필터)을 유지합니다.
           meetingData.participants = participantsList
             .filter((p: any) => p.status === "APPROVED")
             .map((p: any) => ({
@@ -209,6 +210,39 @@ const MeetingDetailPage = () => {
         }
       }
 
+      // [수정 2] 데이터가 준비된 후 내 참여 상태를 확인합니다. (순서를 아래로 내림)
+      if (meetingData.participants && user?.userId) {
+        const myInfo = meetingData.participants.find(
+          (p: any) => p.userId === user.userId,
+        );
+
+        if (myInfo) {
+          // 내 정보가 발견되면 상태 업데이트
+          if (myInfo.status === "APPROVED") {
+            setIsParticipating(true);
+            setParticipationStatus("APPROVED");
+            console.log(
+              "✅ 상세 정보 내에서 내 참여 확인됨 (APPROVED):",
+              myInfo,
+            );
+          } else if (myInfo.status === "PENDING") {
+            setIsParticipating(true);
+            setParticipationStatus("PENDING");
+            console.log(
+              "✅ 상세 정보 내에서 내 참여 확인됨 (PENDING):",
+              myInfo,
+            );
+          }
+        } else {
+          // [수정 3] 참여자가 아니거나 목록에 없으면 상태 초기화 (중요)
+          setIsParticipating(false);
+          setParticipationStatus(null);
+        }
+      }
+
+      // ✅ 최근 조회 모임 localStorage에 저장
+      saveToRecentViewed(meetingData);
+
       setMeeting(meetingData);
     } catch (err) {
       console.error("❌ 모임 조회 실패:", err);
@@ -222,10 +256,9 @@ const MeetingDetailPage = () => {
     if (!user || !meetingId) return;
 
     try {
-      const response = await axios.get(
-        `http://localhost:8080/api/participations/my`,
-        { withCredentials: true },
-      );
+      const response = await axios.get(`/api/meetings/${meetingId}`, {
+        withCredentials: true,
+      });
 
       const participation = response.data.find(
         (p: any) => p.meetingId === parseInt(meetingId),
@@ -502,6 +535,8 @@ const MeetingDetailPage = () => {
   };
 
   const getParticipationButtonText = () => {
+    if (meeting?.status === "COMPLETED") return "🏁 완료된 모임";
+
     if (meeting?.isFull) return "모집 마감";
     if (!isParticipating) return "✨ 참여 신청하기";
 
@@ -512,6 +547,8 @@ const MeetingDetailPage = () => {
         return "✅ 참여 중";
       case "REJECTED":
         return "❌ 참여 거절됨";
+      case "COMPLETED":
+        return "🏁 참여 완료";
       default:
         return "✨ 참여 신청하기";
     }
@@ -520,7 +557,12 @@ const MeetingDetailPage = () => {
   const isOrganizer = user?.userId === meeting?.organizerId;
 
   const isButtonDisabled = () => {
-    return isOrganizer || meeting?.isFull || isParticipating;
+    return (
+      isOrganizer ||
+      meeting?.isFull ||
+      isParticipating ||
+      meeting?.status === "COMPLETED"
+    );
   };
 
   const handleOrganizerAction = () => {
@@ -583,10 +625,15 @@ const MeetingDetailPage = () => {
       <div className="hero">
         {meeting.imageUrl && (
           <img
-            src={`${API_ORIGIN}${meeting.imageUrl}`}
+            src={
+              meeting.imageUrl.startsWith("http")
+                ? meeting.imageUrl // 절대 경로인 경우 그대로 사용
+                : `${API_ORIGIN}${meeting.imageUrl}` // 상대 경로인 경우에만 도메인 결합
+            }
             alt={meeting.title}
             className="hero-image"
             onError={(e) => {
+              e.currentTarget.src = "/icons/icon-192x192.png";
               e.currentTarget.style.display = "none";
               console.error("이미지 로드 실패:", meeting.imageUrl);
             }}

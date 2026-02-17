@@ -40,7 +40,6 @@ class ModelLoader:
         # 모델 초기화
         self.ranker: Optional[LightGBMRankerModel] = None      # ✅ Ranker (검색/피드용)
         self.regressor: Optional[LightGBMRegressorModel] = None   # ✅ Regressor (만족도 예측용)
-        # self.kcelectra: Optional[KcELECTRAModel] = None  # 🔥 제거
         self.svd: Optional[SVDModel] = None
         self.feature_builder: Optional[FeatureBuilder] = None
 
@@ -54,12 +53,12 @@ class ModelLoader:
 
         try:
             # 1. FeatureBuilder
-            print("\n[1/4] FeatureBuilder 초기화...")
+            print("\n[1/5] FeatureBuilder 초기화...")
             self.feature_builder = FeatureBuilder()
             print("✅ FeatureBuilder 준비 완료")
 
             # 2. LightGBM Ranker (검색/피드용)
-            print("\n[2/4] LightGBM Ranker 로딩...")
+            print("\n[2/5] LightGBM Ranker 로딩...")
             self.ranker = LightGBMRankerModel(
                 model_path="models/lightgbm_ranker.pkl",
                 calib_path="models/lightgbm_ranker_calibration.json"
@@ -67,16 +66,12 @@ class ModelLoader:
             self.ranker.load()
 
             # 3. LightGBM Regressor (만족도 예측용)
-            print("\n[3/4] LightGBM Regressor 로딩...")
+            print("\n[3/5] LightGBM Regressor 로딩...")
             self.regressor = LightGBMRegressorModel(
                 model_path="models/lightgbm_regressor.pkl"  # ✅ Regressor 파일
             )
-            self.regressor.load()
 
-            # 4. KcELECTRA - 🔥 제거됨
-            # print("\n[4/5] KcELECTRA 로딩...")
-            # self.kcelectra = KcELECTRAModel()
-            # self.kcelectra.load()
+            self.regressor.load()
 
             # 5. SVD
             print("\n[4/4] SVD 모델 로딩...")
@@ -97,7 +92,6 @@ class ModelLoader:
                 self.feature_builder is not None and
                 self.ranker is not None and self.ranker.is_loaded() and
                 self.regressor is not None and self.regressor.is_loaded() and
-                # self.kcelectra is not None and self.kcelectra.is_loaded() and  # 🔥 제거
                 self.svd is not None and self.svd.is_loaded()
         )
 
@@ -107,7 +101,6 @@ class ModelLoader:
             "feature_builder": self.feature_builder is not None,
             "ranker": self.ranker is not None and self.ranker.is_loaded(),
             "regressor": self.regressor is not None and self.regressor.is_loaded(),
-            # "kcelectra": self.kcelectra is not None and self.kcelectra.is_loaded(),  # 🔥 제거
             "svd": self.svd is not None and self.svd.is_loaded(),
             "ready": self.is_ready()
         }
