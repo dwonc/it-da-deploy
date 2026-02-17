@@ -7,7 +7,9 @@ import type {
 } from "@/types/auth.types";
 
 const apiClient = axios.create({
-  baseURL: "http://localhost:8080/api",
+  baseURL: import.meta.env.VITE_API_URL
+    ? `${import.meta.env.VITE_API_URL}/api`
+    : "https://api.it-da.cloud/api",
   timeout: 10000,
   headers: {
     "Content-Type": "application/json",
@@ -46,7 +48,7 @@ apiClient.interceptors.response.use(
       }
     }
     return Promise.reject(error);
-  }
+  },
 );
 
 export const authAPI = {
