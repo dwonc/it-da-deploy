@@ -43,7 +43,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // ✅ 웹소켓 엔드포인트 추가!
                         .requestMatchers("/ws/**", "/ws-stomp/**").permitAll()
-                        .requestMatchers("/", "/api/**", "/login/**", "/oauth2/**", "/error").permitAll()
+                        .requestMatchers("/","/ai/**", "/api/**", "/login/**", "/oauth2/**", "/error").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/api/files/**").permitAll()

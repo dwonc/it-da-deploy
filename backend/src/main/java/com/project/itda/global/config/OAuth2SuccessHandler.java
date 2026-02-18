@@ -66,7 +66,7 @@ public class OAuth2SuccessHandler extends SimpleUrlAuthenticationSuccessHandler 
         log.info("  - SessionUser: {}", sessionUser);
 
         // ✅ 프론트엔드로 리다이렉트
-        String targetUrl = "http://localhost:3000/auth/callback";
+        String targetUrl = "https://it-da.cloud/auth/callback";
         log.info("리다이렉트: {}", targetUrl);
 
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
