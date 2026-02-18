@@ -8,6 +8,10 @@ WORKDIR /app
 # 빌드에 필요한 도구 설치
 RUN apk add --no-cache python3 make g++
 
+# ✅ ARG 추가
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
 # package.json과 lock 파일 복사
 COPY package*.json ./
 

@@ -28,7 +28,17 @@ services:
     networks:
       - itda-network
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p${DB_PASSWORD}",
+        ]
       interval: 10s
       timeout: 10s
       retries: 10
@@ -61,7 +71,6 @@ services:
       kakao.api.key: ${KAKAO_API_KEY}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-
 
     depends_on:
       redis:
@@ -104,7 +113,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
+        VITE_API_URL: ${VITE_API_URL}
         VITE_KAKAO_MAP_KEY: ${VITE_KAKAO_MAP_KEY}
     container_name: itda-frontend
     restart: unless-stopped
