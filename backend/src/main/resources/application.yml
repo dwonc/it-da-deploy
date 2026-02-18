@@ -111,6 +111,7 @@ file:
 
 server:
   port: 8080
+  forward-headers-strategy: framework    # 이거 추가
   servlet:
     context-path: /
     session:
